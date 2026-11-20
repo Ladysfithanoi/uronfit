@@ -36,6 +36,12 @@ const q = (sql, params) => db.query(sql, params)
 const one = async (sql, params) => (await q(sql, params)).rows[0]
 
 const reset = process.argv.includes('--reset')
+// Khoá an toàn: database đã có dữ liệu THẬT. --reset xoá sạch mọi khách hàng, giáo án, số đo.
+if (reset && process.env.SEED_ALLOW_RESET !== 'xoa-het-du-lieu') {
+  console.error('--reset sẽ XOÁ TOÀN BỘ dữ liệu thật. Chỉ dùng trên project Supabase thử nghiệm.')
+  console.error('Nếu chắc chắn, chạy lại với biến môi trường SEED_ALLOW_RESET=xoa-het-du-lieu')
+  process.exit(1)
+}
 
 // ─── Xoá dữ liệu cũ ─────────────────────────────────────────────────────────
 const { rows: [{ n }] } = await q('select count(*)::int as n from clients')

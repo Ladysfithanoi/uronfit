@@ -5,6 +5,8 @@
 Brief gốc: `Brief Claude Code — App quản lý khách hàng UR Private Gym.pdf` (đọc trước khi làm bước mới).
 Đã build xong cả 6 bước (người dùng chọn làm liền một mạch rồi kiểm tra một lượt, 20/11/2026); còn lại: triển khai Vercel. Không thêm tính năng ngoài brief khi chưa đề xuất. Nhật ký ăn uống (ý từ app Chisu) để sau Bước 6.
 
+⚠️ Từ 20/11/2026 database Supabase (mlfkcldgebbtehkyrtzm) là DỮ LIỆU THẬT, dùng chung cho máy và Vercel: KHÔNG chạy db:seed --reset hay npm run test:rls (cần dữ liệu mẫu) trên project này — dùng một project Supabase thử nghiệm riêng. Kiểm thử thủ công thì tạo dữ liệu tạm có tên/email `urgym-selftest` và tự dọn.
+
 Quyết định đã đổi so với brief (người dùng duyệt 20/11/2026):
 - Đăng nhập chỉ bằng email, không mật khẩu: mã 6 số + link trong cùng một email
   (server sinh bằng Supabase Admin `generateLink`, tự gửi qua Gmail — không dùng SMTP của Supabase).

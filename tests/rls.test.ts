@@ -205,6 +205,15 @@ describe('Sửa thông tin tài khoản', () => {
     expect(e2).not.toBeNull()
   })
 
+  it('Không ai xoá được tài khoản trực tiếp qua database (xoá PT chỉ qua server, sau khi kiểm tra FM)', async () => {
+    const { data: a } = await users.pt1.from('profiles').delete().eq('id', ids.pt2).select()
+    expect(a ?? []).toEqual([])
+    const { data: b } = await users.fm.from('profiles').delete().eq('id', ids.pt2).select()
+    expect(b ?? []).toEqual([])
+    const { count } = await admin.from('profiles').select('id', { count: 'exact', head: true }).eq('id', ids.pt2)
+    expect(count).toBe(1)
+  })
+
   it('Bảng mã đổi email: không người dùng nào đọc/ghi được, kể cả FM', async () => {
     const { data, error } = await users.fm.from('email_change_requests').select('*')
     expect(error !== null || (data ?? []).length === 0).toBe(true)
