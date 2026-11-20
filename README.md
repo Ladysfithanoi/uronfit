@@ -20,7 +20,7 @@ Web app (PWA, dùng tốt trên điện thoại) để **FM, PT và khách hàng
 
 | # | Kịch bản | Làm thế nào |
 |---|---|---|
-| 1 | FM tạo tài khoản PT, tạo khách và gán cho PT đó | Đăng nhập `+fm` → **Nhân sự → Thêm PT**; **Khách hàng → Thêm khách**, chọn PT phụ trách |
+| 1 | FM tạo tài khoản PT, tạo khách và gán cho PT đó | Đăng nhập email FM (`tieuanhfitness@gmail.com`) → **Nhân sự → Thêm PT**; **Khách hàng → Thêm khách**, chọn PT phụ trách |
 | 2 | PT tạo lộ trình 3 giai đoạn cho khách giảm mỡ, giáo án 4 tuần và meal plan giai đoạn 1 | `+pt1` → mở khách → tab **Lộ trình** (+ Giai đoạn ×3) → tab **Giáo án** (4 tuần × 3 buổi, hoặc từ mẫu "Mẫu giảm mỡ 3 buổi/tuần") → tab **Thực đơn** |
 | 3 | 3 lần đo ở 2 giai đoạn: biểu đồ, vạch giai đoạn, bảng đầu/cuối | Tab **Chỉ số** của khách. Dữ liệu mẫu: Thu Hà đã có 4 lần đo qua 2 giai đoạn |
 | 4 | PT thêm bài mới kèm ảnh + link video rồi dùng trong giáo án | **Thư viện → Thêm bài** (tải ảnh, dán link YouTube) → mở giáo án → **Thêm bài** |
@@ -68,7 +68,7 @@ Script tự gắn nhãn chống chỉ định **cột sống** cho bài dồn t�
 | `GMAIL_USER` | Địa chỉ Gmail dùng để gửi email đăng nhập | Có |
 | `GMAIL_APP_PASSWORD` | Mật khẩu ứng dụng 16 ký tự (xem mục 3) | Có |
 | `APP_URL` | Địa chỉ app sau khi triển khai, vd `https://urgym.vercel.app` | Khi triển khai |
-| `FM_EMAIL` | Email thật của FM, dùng khi nạp dữ liệu mẫu | Không |
+| `FM_EMAIL` | Email thật của FM, dùng khi nạp dữ liệu mẫu (mặc định = `GMAIL_USER`) | Không |
 | `SEED_EMAIL` | Hộp thư nhận mã của các tài khoản demo (mặc định = `GMAIL_USER`) | Không |
 
 > Chạy trên máy mà chưa cấu hình Gmail: mã đăng nhập được in ra cửa sổ terminal đang chạy `npm run dev` để vẫn đăng nhập thử được. Khi chạy thật (production) bắt buộc phải có Gmail.
@@ -87,7 +87,7 @@ Dữ liệu mẫu tạo các tài khoản dùng **"Gmail +"**: mọi email `ten+
 
 | Vai trò | Email | Ghi chú |
 |---|---|---|
-| FM | `FM_EMAIL`, hoặc `<gmail>+fm@gmail.com` | Quản lý phòng tập |
+| FM | `FM_EMAIL`, hoặc chính `<gmail>@gmail.com` | Quản lý phòng tập |
 | PT | `<gmail>+pt1@…` | HLV Ngọc Lan: Thu Hà (giảm mỡ, lộ trình 3 giai đoạn), nhóm 1:2 Mai Anh – Ngọc Trâm |
 | PT | `<gmail>+pt2@…` | HLV Minh Khoa: Thị Hồng (thoát vị L4–L5), Quang Huy (chỉnh dáng, khách nam), nhóm trẻ em 3 bé |
 | Khách | `+ha`, `+maianh`, `+tram`, `+hong`, `+huy` | Mỗi khách chỉ thấy hồ sơ của mình |

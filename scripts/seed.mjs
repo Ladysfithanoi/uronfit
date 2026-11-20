@@ -6,7 +6,7 @@
 //
 // Email tài khoản demo dùng "Gmail +": <ten>+pt1@gmail.com ... đều về chung một
 // hộp thư SEED_EMAIL (mặc định = GMAIL_USER), nên đăng nhập thử được mọi vai trò.
-// FM_EMAIL: email thật của FM (chị chủ); bỏ trống thì dùng <ten>+fm@gmail.com.
+// FM_EMAIL: email thật của FM (chị chủ); bỏ trống thì dùng chính hộp thư SEED_EMAIL / GMAIL_USER.
 import { config } from 'dotenv'
 import pg from 'pg'
 import { createClient } from '@supabase/supabase-js'
@@ -72,7 +72,7 @@ async function account(email, full_name, role, created_by = null, phone = null) 
   return id
 }
 
-const fmEmail = (process.env.FM_EMAIL || demoEmail('fm')).toLowerCase()
+const fmEmail = (process.env.FM_EMAIL || base).toLowerCase()
 const fm  = await account(fmEmail, 'Quản lý UR Gym', 'fm')
 const pt1 = await account(demoEmail('pt1'), 'HLV Ngọc Lan', 'pt', fm, '0901000001')
 const pt2 = await account(demoEmail('pt2'), 'HLV Minh Khoa', 'pt', fm, '0901000002')
