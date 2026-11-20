@@ -84,13 +84,55 @@ export async function renewPackage(clientId: string, name: string, total: number
   })
 }
 
+/**
+ * Xoá hồ sơ khách — CHỈ FM (RLS clients_delete cũng chỉ cho FM).
+ * Dọn kèm: ảnh trong kho riêng tư, và khoá tài khoản khách/phụ huynh không còn gắn hồ sơ nào.
+ */
+async function removeClients(ids: string[]): Promise<number> {
+  const unique = [...new Set(ids)].filter((id) => /^[0-9a-f-]{36}$/i.test(id))
+  if (!unique.length) return 0
+  if (unique.length > 200) throw new HttpError(400, 'Mỗi lần xoá tối đa 200 khách.')
+  const supabase = await createClient()
+  const admin = createAdminClient()
+
+  // Ghi lại tài khoản đang gắn trước khi xoá (client_access sẽ bị xoá theo)
+  const { data: access } = await admin.from('client_access').select('profile_id').in('client_id', unique)
+
+  const deleted = must(await supabase.from('clients').delete().in('id', unique).select('id')).map((r) => r.id)
+  if (!deleted.length) throw new HttpError(403, 'Không xoá được hồ sơ đã chọn.')
+
+  // Ảnh: {client_id}/avatar-… và {client_id}/progress/…
+  for (const id of deleted) {
+    const paths: string[] = []
+    for (const dir of [id, `${id}/progress`]) {
+      const { data: files } = await admin.storage.from('client-media').list(dir, { limit: 1000 })
+      for (const f of files ?? []) if (f.id) paths.push(`${dir}/${f.name}`)
+    }
+    if (paths.length) await admin.storage.from('client-media').remove(paths)
+  }
+
+  // Tài khoản không còn gắn hồ sơ nào → khoá (phụ huynh còn bé khác thì giữ)
+  for (const pid of new Set((access ?? []).map((a) => a.profile_id))) {
+    const { count } = await admin.from('client_access').select('client_id', { count: 'exact', head: true }).eq('profile_id', pid)
+    if (!count) await setAccountActive(pid, false)
+  }
+  return deleted.length
+}
+
 export async function deleteClient(clientId: string) {
   return run(async () => {
     await requireApiRole('fm')
-    const supabase = await createClient()
-    const res = must(await supabase.from('clients').delete().eq('id', clientId).select('id'))
-    if (!res?.length) throw new HttpError(403, 'Không xoá được hồ sơ này.')
+    await removeClients([clientId])
     revalidatePath('/khach-hang', 'layout')
+  })
+}
+
+export async function deleteClients(ids: string[]) {
+  return run(async () => {
+    await requireApiRole('fm')
+    const n = await removeClients(ids)
+    revalidatePath('/khach-hang', 'layout')
+    return { deleted: n }
   })
 }
 

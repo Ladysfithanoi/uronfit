@@ -158,6 +158,19 @@ describe('Giáo án và nút Chia sẻ', () => {
   })
 })
 
+describe('Xoá hàng loạt hồ sơ khách', () => {
+  it('PT không xoá được nhiều khách một lúc, kể cả khách của mình; FM xoá được', async () => {
+    const mk = async (name: string) => (await users.pt1.from('clients').insert({ full_name: name, gender: 'female', pt_id: ids.pt1 }).select('id').single()).data!.id
+    const a = await mk('Xoá loạt A'), b = await mk('Xoá loạt B')
+    const { data: byPt } = await users.pt1.from('clients').delete().in('id', [a, b]).select('id')
+    expect(byPt).toEqual([])
+    const { count } = await admin.from('clients').select('id', { count: 'exact', head: true }).in('id', [a, b])
+    expect(count).toBe(2)
+    const { data: byFm } = await users.fm.from('clients').delete().in('id', [a, b]).select('id')
+    expect(byFm).toHaveLength(2)
+  })
+})
+
 describe('Tài khoản & vai trò', () => {
   it('Khách chỉ thấy tài khoản của chính mình', async () => {
     const { data } = await users.ha.from('profiles').select('id')
