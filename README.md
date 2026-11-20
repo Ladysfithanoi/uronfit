@@ -133,7 +133,7 @@ Kết quả hiện tại: **26/26 ca đạt**. Trên Windows hãy chạy lệnh 
 3. Ở **Environment Variables**, thêm: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `APP_URL`. **Không** cần `DATABASE_URL`.
 4. Bấm **Deploy**. Có địa chỉ rồi thì cập nhật `APP_URL` cho đúng và deploy lại.
 5. Supabase → **Authentication → URL Configuration**: đặt **Site URL** bằng địa chỉ Vercel.
-6. Khuyến nghị: Supabase → **Authentication → Providers → Email**: đặt *Email OTP Expiration* = `3600` (khớp dòng "hết hạn sau 60 phút" trong email).
+6. Không cần chỉnh cài đặt mã OTP trong Supabase: **app tự sinh mã đăng nhập 6 số** (hiệu lực 15 phút, sai quá 5 lần thì huỷ) và chỉ dùng Supabase để tạo phiên đăng nhập.
 
 ## 7. Cấu trúc thư mục
 

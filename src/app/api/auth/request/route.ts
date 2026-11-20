@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { sendLoginEmail } from '@/lib/email'
+import { issueLoginCode } from '@/lib/login-code'
 import { appOrigin, normalizeEmail } from '@/lib/origin'
 
 // Gửi email đăng nhập (mã 6 số + link). Chỉ tài khoản đã được FM/PT tạo mới nhận được.
@@ -33,16 +34,18 @@ export async function POST(req: Request) {
     .select('id, is_active').eq('email', email).maybeSingle()
   if (!profile?.is_active) return Response.json(GENERIC)
 
-  const { data, error } = await admin.auth.admin.generateLink({ type: 'magiclink', email })
-  if (error || !data?.properties) {
+  // Mã 6 số do app tự sinh (không dùng email_otp của Supabase — độ dài tuỳ cài đặt project)
+  let issued: { code: string; linkToken: string }
+  try {
+    issued = await issueLoginCode(email)
+  } catch {
     console.error('[auth/request] không tạo được mã đăng nhập')
     return Response.json({ error: 'Không gửi được mã lúc này, vui lòng thử lại.' }, { status: 500 })
   }
 
-  const { email_otp, hashed_token } = data.properties
-  const link = `${appOrigin(req)}/auth/confirm?token_hash=${encodeURIComponent(hashed_token)}&type=magiclink`
+  const link = `${appOrigin(req)}/auth/confirm?t=${encodeURIComponent(issued.linkToken)}`
   try {
-    await sendLoginEmail(email, email_otp, link)
+    await sendLoginEmail(email, issued.code, link)
   } catch {
     console.error('[auth/request] gửi email thất bại')
     return Response.json({ error: 'Không gửi được email lúc này, vui lòng thử lại.' }, { status: 502 })

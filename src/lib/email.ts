@@ -63,9 +63,9 @@ export async function sendLoginEmail(to: string, code: string, link: string) {
     <div style="font-size:34px;font-weight:700;letter-spacing:10px;text-align:center;background:#000;border:1px solid #FD3786;border-radius:12px;padding:16px 8px;color:#fff">${code}</div>
     <p style="font-size:14px;color:#a0a0a0;text-align:center;margin:20px 0 0">hoặc bấm nút để đăng nhập ngay trên máy này:</p>
     ${btn(link, 'Đăng nhập')}
-    <p style="font-size:13px;line-height:1.6;color:#a0a0a0;margin:0">Mã chỉ dùng được một lần và hết hạn sau 60 phút. Nếu đã cài app lên màn hình chính iPhone, hãy <b style="color:#fff">nhập mã</b> thay vì bấm nút.</p>
+    <p style="font-size:13px;line-height:1.6;color:#a0a0a0;margin:0">Mã chỉ dùng được một lần và hết hạn sau 15 phút. Nếu đã cài app lên màn hình chính iPhone, hãy <b style="color:#fff">nhập mã</b> thay vì bấm nút.</p>
     <p style="font-size:13px;line-height:1.6;color:#a0a0a0;margin:12px 0 0">Nếu bạn không yêu cầu đăng nhập, hãy bỏ qua email này — tài khoản của bạn vẫn an toàn.</p>`)
-  const text = `Mã đăng nhập UR Private Gym: ${code}\nHoặc mở link: ${link}\nMã chỉ dùng một lần, hết hạn sau 60 phút.`
+  const text = `Mã đăng nhập UR Private Gym: ${code}\nHoặc mở link: ${link}\nMã chỉ dùng một lần, hết hạn sau 15 phút.`
   await send(to, `${code} là mã đăng nhập UR Private Gym`, html, text)
 }
 

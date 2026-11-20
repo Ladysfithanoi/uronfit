@@ -100,7 +100,7 @@ export function LoginForm({ notice }: { notice?: string }) {
       </p>
       <div className="space-y-2">
         <Label htmlFor="code" className="label-caps">Mã đăng nhập</Label>
-        <Input id="code" ref={codeRef} inputMode="numeric" autoComplete="one-time-code" maxLength={10}
+        <Input id="code" ref={codeRef} inputMode="numeric" autoComplete="one-time-code" maxLength={6}
           placeholder="••••••" value={code}
           className="h-14 text-center text-2xl font-bold tracking-[0.5em]"
           onChange={(e) => {
