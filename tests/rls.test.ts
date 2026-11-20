@@ -191,6 +191,28 @@ describe('Tài khoản & vai trò', () => {
   })
 })
 
+describe('Sửa thông tin tài khoản', () => {
+  it('Tự sửa họ tên + SĐT của mình; không sửa được người khác; không tự đổi email qua database', async () => {
+    const { data: before } = await admin.from('profiles').select('full_name, phone, email').eq('id', ids.fm).single()
+    const { data: ok, error } = await users.fm.from('profiles').update({ full_name: 'FM đổi tên thử', phone: '0909' }).eq('id', ids.fm).select('full_name')
+    expect(error).toBeNull()
+    expect(ok).toEqual([{ full_name: 'FM đổi tên thử' }])
+    await admin.from('profiles').update({ full_name: before!.full_name, phone: before!.phone }).eq('id', ids.fm)
+
+    const { data: other } = await users.pt1.from('profiles').update({ full_name: 'X' }).eq('id', ids.pt2).select()
+    expect(other ?? []).toEqual([])
+    const { error: e2 } = await users.fm.from('profiles').update({ email: 'hack@example.com' }).eq('id', ids.fm)
+    expect(e2).not.toBeNull()
+  })
+
+  it('Bảng mã đổi email: không người dùng nào đọc/ghi được, kể cả FM', async () => {
+    const { data, error } = await users.fm.from('email_change_requests').select('*')
+    expect(error !== null || (data ?? []).length === 0).toBe(true)
+    const ins = await users.fm.from('email_change_requests').insert({ user_id: ids.fm, new_email: 'x@x.vn', code_hash: 'x', expires_at: new Date().toISOString() })
+    expect(ins.error).not.toBeNull()
+  })
+})
+
 describe('Ghi chú nội bộ "chỉ HLV thấy"', () => {
   it('Khách không thấy ghi chú nội bộ; PT phụ trách thấy đủ', async () => {
     const { data: mine } = await users.hong.from('notes').select('coach_only')
@@ -282,7 +304,7 @@ describe('Kho ảnh riêng tư', () => {
 describe('Gói tập, buổi tập, nhóm', () => {
   it('Hoàn thành buổi (giáo án cá nhân) tự trừ 1 buổi; huỷ hoàn thành thì hoàn lại', async () => {
     const pkg = async () => (await admin.from('client_packages').select('used_sessions').eq('client_id', ids['Nguyễn Thu Hà']).eq('is_active', true).single()).data!.used_sessions
-    const { data: s } = await users.pt1.from('workout_sessions').select('id, workout_plans!inner(phase_id)').is('completed_at', null).limit(1).single()
+    const { data: s } = await users.pt1.from('workout_sessions').select('id, workout_plans!inner(phase_id)').is('completed_at', null).eq('is_self_training', false).not('workout_plans.phase_id', 'is', null).limit(1).single()
     const before = await pkg()
     await users.pt1.from('workout_sessions').update({ completed_at: new Date().toISOString() }).eq('id', s!.id)
     expect(await pkg()).toBe(before + 1)

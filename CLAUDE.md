@@ -10,6 +10,7 @@ Quyết định đã đổi so với brief (người dùng duyệt 20/11/2026):
   (server sinh bằng Supabase Admin `generateLink`, tự gửi qua Gmail — không dùng SMTP của Supabase).
 - Mỗi máy mới phải xác nhận qua email; có màn "Thiết bị đang đăng nhập" (đăng xuất từ xa) và email cảnh báo máy mới.
 - Có công cụ GỢI Ý calo/macro cho PT (`src/lib/nutrition.ts`, cùng công thức app diet-plan); không tự áp số; khoá với khách trẻ em & phục hồi chức năng. Chiều cao nhập cho mọi khách.
+- Giữ KHÔNG mật khẩu (người dùng chốt lại 20/11). Mục Tài khoản: mọi vai trò tự sửa họ tên + SĐT; chỉ FM đổi email (mã 6 số gửi tới email mới, báo email cũ; bảng `email_change_requests` chỉ service role).
 - Thư viện bài tập nhập thêm từ app training-plan bằng `npm run import:exercises` (chỉ đọc nguồn, idempotent).
 
 Quy ước:

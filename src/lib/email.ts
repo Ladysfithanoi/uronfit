@@ -95,6 +95,24 @@ export async function sendInviteEmail(to: string, name: string, inviter: string,
   await send(to, 'Tài khoản UR Private Gym của bạn đã sẵn sàng', html, text)
 }
 
+/** Mã xác nhận đổi email — gửi tới EMAIL MỚI */
+export async function sendEmailChangeCode(to: string, code: string) {
+  const html = layout('Xác nhận email mới', `
+    <p style="font-size:15px;line-height:1.6;color:#ddd;margin:0 0 16px;text-align:center">Nhập mã dưới đây trong mục <b>Tài khoản</b> của app UR Private Gym để dùng email này làm email đăng nhập:</p>
+    <div style="font-size:34px;font-weight:700;letter-spacing:10px;text-align:center;background:#000;border:1px solid #FD3786;border-radius:12px;padding:16px 8px;color:#fff">${code}</div>
+    <p style="font-size:13px;line-height:1.6;color:#a0a0a0;margin:16px 0 0">Mã có hiệu lực 15 phút. Nếu bạn không yêu cầu đổi email, hãy bỏ qua email này.</p>`)
+  await send(to, `${code} là mã xác nhận email mới — UR Private Gym`, html, `Mã xác nhận email mới UR Private Gym: ${code} (hiệu lực 15 phút).`)
+}
+
+/** Thông báo tới EMAIL CŨ sau khi đổi */
+export async function sendEmailChangedNotice(to: string, name: string, newEmail: string, at: Date) {
+  const html = layout('Email đăng nhập đã thay đổi', `
+    <p style="font-size:15px;line-height:1.6;color:#ddd;margin:0 0 12px">Chào ${escapeHtml(name)},</p>
+    <p style="font-size:15px;line-height:1.6;color:#ddd;margin:0 0 12px">Email đăng nhập tài khoản UR Private Gym của bạn vừa được đổi sang <b>${escapeHtml(newEmail)}</b> lúc ${formatDateTime(at)}.</p>
+    <p style="font-size:14px;line-height:1.6;color:#a0a0a0;margin:0">Từ nay mã đăng nhập sẽ gửi tới email mới. Nếu bạn <b style="color:#fff">không</b> thực hiện thay đổi này, hãy liên hệ ngay người quản trị app.</p>`)
+  await send(to, 'Email đăng nhập UR Private Gym đã thay đổi', html, `Email đăng nhập UR Private Gym đã đổi sang ${newEmail} lúc ${formatDateTime(at)}. Nếu không phải bạn, hãy liên hệ người quản trị app.`)
+}
+
 function escapeHtml(s: string) {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
 }
