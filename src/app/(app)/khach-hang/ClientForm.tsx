@@ -16,6 +16,13 @@ import { todayVN } from '@/lib/date'
 import type { Client, Package } from '@/lib/clients'
 import type { GoalGroup, TrainingType, ClientStatus, Gender } from '@/lib/types'
 import { saveClient, setClientAvatar, type ClientInput } from './actions'
+import { Sparkles } from 'lucide-react'
+import { AiMealFields, AiWorkoutFields, defaultMeal, defaultWorkout, type MealForm, type WorkoutForm } from '@/components/ai/AiFields'
+import { aiCreateMealPlan, aiCreateWorkoutPlan, ensureFirstPhase, recordInitialWeight } from '@/app/actions/ai'
+import { createWorkoutPlan } from '@/app/(app)/giao-an/actions'
+import { createMealPlan } from '@/app/(app)/thuc-don/actions'
+
+type StartMode = 'none' | 'ai' | 'manual'
 
 export function ClientForm({ client, pkg, pts, isFm, meId }: {
   client?: Client; pkg?: Package | null; pts: { id: string; full_name: string }[]; isFm: boolean; meId: string
@@ -37,12 +44,53 @@ export function ClientForm({ client, pkg, pts, isFm, meId }: {
   })
   const set = <K extends keyof ClientInput>(k: K, v: ClientInput[K]) => setF((p) => ({ ...p, [k]: v }))
   const isKid = f.is_kid || f.goals.includes('kids')
+  const isNew = !client
+  // Lịch tập & thực đơn ban đầu (chỉ khi tạo khách mới)
+  const [wMode, setWMode] = useState<StartMode>('none')
+  const [mMode, setMMode] = useState<StartMode>('none')
+  const [wf, setWf] = useState<WorkoutForm>(defaultWorkout)
+  const [mf, setMf] = useState<MealForm>(defaultMeal)
+  const [step, setStep] = useState('')
+  const mealAiBlocked = isKid ? 'Khách trẻ em: không tạo thực đơn tự động.' : f.goals.includes('rehab') ? 'Khách phục hồi chức năng: không tạo thực đơn tự động.' : null
+
+  /** Sau khi tạo hồ sơ: cân nặng ban đầu → lịch tập → thực đơn. Lỗi từng bước không chặn các bước sau. */
+  async function createStarters(id: string): Promise<string> {
+    let tab = ''
+    if (mf.weightKg) { setStep('Đang lưu cân nặng…'); const r = await recordInitialWeight(id, mf.weightKg); if (!r.ok) toast.error(r.error) }
+    if (wMode !== 'none') {
+      setStep(wMode === 'ai' ? 'AI đang soạn lịch tập… (≈20–40 giây)' : 'Đang tạo giáo án…')
+      if (wMode === 'ai') {
+        const r = await aiCreateWorkoutPlan(id, wf)
+        if (r.ok) { tab = 'giao-an'; toast.success(r.data!.usedAi ? `AI đã tạo ${r.data!.sessions} buổi tập.` : `Đã dựng ${r.data!.sessions} buổi theo quy tắc (AI tạm không khả dụng).`) }
+        else toast.error(`Lịch tập: ${r.error}`)
+      } else {
+        const ph = await ensureFirstPhase(id, wf.weeks)
+        const r = ph.ok ? await createWorkoutPlan({ name: wf.name || `Giáo án ${wf.weeks} tuần`, phaseId: ph.data!.phaseId, weeks: wf.weeks, perWeek: wf.sessionsPerWeek }) : ph
+        if (r.ok) tab = 'giao-an'; else toast.error(`Lịch tập: ${r.error}`)
+      }
+    }
+    if (mMode !== 'none') {
+      setStep(mMode === 'ai' ? 'Đang tạo thực đơn… (≈10–30 giây)' : 'Đang tạo thực đơn…')
+      if (mMode === 'ai') {
+        const r = await aiCreateMealPlan(id, mf)
+        if (r.ok) { tab ||= 'thuc-don'; toast.success(`Đã tạo thực đơn ${r.data!.days} ngày · ${r.data!.kcal} kcal.`) } else toast.error(`Thực đơn: ${r.error}`)
+      } else {
+        const ph = await ensureFirstPhase(id, wf.weeks)
+        const r = ph.ok ? await createMealPlan({ name: mf.name || 'Thực đơn', phaseId: ph.data!.phaseId, kcal: mf.kcal, protein: mf.protein, carb: mf.carb, fat: mf.fat }) : ph
+        if (r.ok) tab ||= 'thuc-don'; else toast.error(`Thực đơn: ${r.error}`)
+      }
+    }
+    setStep('')
+    return tab
+  }
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
+    if (isNew && mMode === 'ai' && mealAiBlocked) { toast.error(mealAiBlocked); return }
     start(async () => {
+      setStep(isNew ? 'Đang tạo hồ sơ…' : '')
       const r = await saveClient(f, client?.id)
-      if (!r.ok) { toast.error(r.error); return }
+      if (!r.ok) { setStep(''); toast.error(r.error); return }
       const id = r.data!.id
       if (avatar) {
         try {
@@ -56,7 +104,8 @@ export function ClientForm({ client, pkg, pts, isFm, meId }: {
         }
       }
       toast.success(client ? 'Đã lưu hồ sơ.' : 'Đã tạo hồ sơ khách.')
-      router.push(`/khach-hang/${id}`)
+      const tab = isNew ? await createStarters(id) : ''
+      router.push(`/khach-hang/${id}${tab ? `?tab=${tab}` : ''}`)
       router.refresh()
     })
   }
@@ -150,10 +199,68 @@ export function ClientForm({ client, pkg, pts, isFm, meId }: {
         </label>
       </Section>
 
+      {isNew && (
+        <Section title="Lịch tập & thực đơn ban đầu">
+          <p className="text-sm text-muted-foreground">
+            Tạo luôn khi lưu hồ sơ — hiện ngay trong hồ sơ khách (tab Giáo án / Thực đơn). App tự tạo &quot;Giai đoạn 1&quot; bắt đầu hôm nay.
+            Mọi thứ tạo ra đều <b className="text-foreground">chưa chia sẻ</b>: PT xem lại rồi mới bấm Chia sẻ.
+          </p>
+
+          <div className="space-y-3 rounded-lg border border-border p-3">
+            <Field label="Lịch tập">
+              <ChipGroup<StartMode> options={[{ value: 'none', label: 'Để sau' }, { value: 'ai', label: '✦ Tạo bằng AI' }, { value: 'manual', label: 'Tạo thủ công' }]}
+                value={[wMode]} onChange={(v) => setWMode(v[0])} />
+            </Field>
+            {wMode === 'ai' && (
+              <>
+                <p className="flex items-start gap-2 text-xs text-muted-foreground"><Sparkles className="mt-0.5 size-3.5 shrink-0 text-brand" />
+                  AI soạn một tuần tập mẫu từ Thư viện theo mục tiêu và tiền sử ở trên, lặp cho đủ số tuần. Bài chống chỉ định với vùng cảnh báo của khách bị loại trước khi đưa cho AI.</p>
+                <AiWorkoutFields value={wf} onChange={setWf} />
+              </>
+            )}
+            {wMode === 'manual' && (
+              <div className="grid grid-cols-2 items-end gap-3">
+                <Field label="Số tuần" htmlFor="mw-weeks">
+                  <NativeSelect id="mw-weeks" value={wf.weeks} onChange={(e) => setWf({ ...wf, weeks: Number(e.target.value) })}>
+                    {[1, 2, 3, 4, 5, 6, 8, 10, 12].map((n) => <option key={n} value={n}>{n}</option>)}
+                  </NativeSelect>
+                </Field>
+                <Field label="Buổi / tuần" htmlFor="mw-per">
+                  <NativeSelect id="mw-per" value={wf.sessionsPerWeek} onChange={(e) => setWf({ ...wf, sessionsPerWeek: Number(e.target.value) })}>
+                    {[1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n}</option>)}
+                  </NativeSelect>
+                </Field>
+                <p className="col-span-2 text-xs text-muted-foreground">Tạo khung trống theo tuần × buổi; PT tự thêm bài trong giáo án.</p>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3 rounded-lg border border-border p-3">
+            <Field label="Thực đơn">
+              <ChipGroup<StartMode> options={[{ value: 'none', label: 'Để sau' }, { value: 'ai', label: '✦ Tạo bằng AI' }, { value: 'manual', label: 'Tạo thủ công' }]}
+                value={[mMode]} onChange={(v) => setMMode(v[0])} />
+            </Field>
+            {mMode === 'ai' && (mealAiBlocked
+              ? <p className="rounded-lg bg-secondary p-3 text-sm text-muted-foreground">{mealAiBlocked} PT tự lên thực đơn (chọn &quot;Tạo thủ công&quot;).</p>
+              : <AiMealFields value={mf} onChange={setMf} askWeight />)}
+            {mMode === 'manual' && (
+              <>
+                <p className="text-xs text-muted-foreground">Tạo thực đơn trống với mục tiêu dưới đây; PT tự thêm món theo ngày, theo bữa.</p>
+                <div className="grid grid-cols-2 items-end gap-3">
+                  {([['kcal', 'Calo (kcal)'], ['protein', 'Đạm (g)'], ['carb', 'Tinh bột (g)'], ['fat', 'Béo (g)']] as const).map(([k, l]) => (
+                    <Field key={k} label={l} htmlFor={`mm-${k}`}><Input id={`mm-${k}`} inputMode="numeric" value={mf[k]} onChange={(e) => setMf({ ...mf, [k]: e.target.value.replace(/\D/g, '') })} /></Field>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </Section>
+      )}
+
       <div className="no-print sticky bottom-20 z-10 grid grid-cols-[auto_1fr] gap-2 md:bottom-4">
         <Button type="button" variant="secondary" size="lg" className="shadow-lg" disabled={pending} onClick={() => router.back()}>Huỷ</Button>
         <Button type="submit" size="lg" className="shadow-lg" disabled={pending}>
-          {pending ? 'Đang lưu…' : client ? 'Lưu hồ sơ' : 'Tạo hồ sơ khách'}
+          {pending ? (step || 'Đang lưu…') : client ? 'Lưu hồ sơ' : (wMode === 'ai' || mMode === 'ai') ? '✦ Tạo hồ sơ & kế hoạch' : 'Tạo hồ sơ khách'}
         </Button>
       </div>
     </form>

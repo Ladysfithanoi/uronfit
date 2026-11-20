@@ -5,6 +5,7 @@ import { currentPhase, type Client, type Phase } from '@/lib/clients'
 import { todayVN } from '@/lib/date'
 import { ProgressBar } from '@/components/plans/ProgressBar'
 import { NewPlanDialog } from '@/components/plans/NewPlanDialog'
+import { AiWorkoutButton } from '@/components/ai/AiCreateDialogs'
 
 export async function WorkoutTab({ client, phases }: { client: Client; phases: Phase[] }) {
   const supabase = await createClient()
@@ -26,7 +27,10 @@ export async function WorkoutTab({ client, phases }: { client: Client; phases: P
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">Giáo án thuộc từng giai đoạn, chia theo tuần và buổi.</p>
-        <NewPlanDialog kind="workout" phases={phases.map((p) => ({ id: p.id, name: p.name }))} defaultPhase={cur?.id} templates={templates ?? []} />
+        <div className="flex flex-wrap justify-end gap-2">
+          <AiWorkoutButton clientId={client.id} phaseId={cur?.id} />
+          <NewPlanDialog kind="workout" phases={phases.map((p) => ({ id: p.id, name: p.name }))} defaultPhase={cur?.id} templates={templates ?? []} />
+        </div>
       </div>
       {phases.map((ph) => {
         const list = (plans ?? []).filter((p) => p.phase_id === ph.id)
@@ -45,7 +49,7 @@ export async function WorkoutTab({ client, phases }: { client: Client; phases: P
           <ul className="space-y-2">{g.workout_plans.map((p) => <PlanLink key={p.id} href={`/giao-an/${p.id}`} name={p.name} shared={!!p.shared_at} sessions={p.workout_sessions} />)}</ul>
         </section>
       ))}
-      {phases.length === 0 && <p className="text-sm text-muted-foreground">Tạo giai đoạn ở tab Lộ trình trước khi lên giáo án.</p>}
+      {phases.length === 0 && <p className="text-sm text-muted-foreground">Chưa có giai đoạn. Bấm <b>Tạo bằng AI</b> — app tự tạo Giai đoạn 1 — hoặc thêm giai đoạn ở tab Lộ trình.</p>}
     </div>
   )
 }

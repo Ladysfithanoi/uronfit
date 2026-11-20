@@ -13,6 +13,7 @@ Quyết định đã đổi so với brief (người dùng duyệt 20/11/2026):
 - Mỗi máy mới phải xác nhận qua email; có màn "Thiết bị đang đăng nhập" (đăng xuất từ xa) và email cảnh báo máy mới.
 - Có công cụ GỢI Ý calo/macro cho PT (`src/lib/nutrition.ts`, cùng công thức app diet-plan); không tự áp số; khoá với khách trẻ em & phục hồi chức năng. Chiều cao nhập cho mọi khách.
 - Giữ KHÔNG mật khẩu (người dùng chốt lại 20/11). Mục Tài khoản: mọi vai trò tự sửa họ tên + SĐT; chỉ FM đổi email (mã 6 số gửi tới email mới, báo email cũ; bảng `email_change_requests` chỉ service role).
+- Tạo lịch tập & thực đơn bằng AI (Gemini, env GEMINI_API_KEYS) — `src/lib/ai/`: workout.ts (theo training-plan; loại bài chống chỉ định TRƯỚC khi gửi AI; dự phòng theo quy tắc), meal-engine.ts + foods-data.ts (chép nguyên bộ giải diet-plan; khoá trẻ em & phục hồi). Nút ở cuối form Thêm khách và tab Giáo án/Thực đơn; kết quả không tự chia sẻ.
 - Thư viện bài tập nhập thêm từ app training-plan bằng `npm run import:exercises` (chỉ đọc nguồn, idempotent).
 
 Quy ước:

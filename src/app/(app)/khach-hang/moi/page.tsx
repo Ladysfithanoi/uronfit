@@ -6,6 +6,9 @@ import { createClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { ClientForm } from '../ClientForm'
 
+// Tạo lịch tập / thực đơn bằng AI có thể mất 20–40 giây (Vercel cho tối đa 60 giây)
+export const maxDuration = 60
+
 export const metadata: Metadata = { title: 'Thêm khách' }
 
 export default async function NewClientPage() {

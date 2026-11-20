@@ -17,6 +17,9 @@ import { MetricsTab } from './tabs/MetricsTab'
 import { WorkoutTab } from './tabs/WorkoutTab'
 import { MealTab } from './tabs/MealTab'
 
+// Tạo lịch tập / thực đơn bằng AI có thể mất 20–40 giây (Vercel cho tối đa 60 giây)
+export const maxDuration = 60
+
 export const metadata: Metadata = { title: 'Hồ sơ khách' }
 
 const TABS = [

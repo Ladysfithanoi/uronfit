@@ -5,6 +5,7 @@ import { currentPhase, type Client, type Phase } from '@/lib/clients'
 import { todayVN } from '@/lib/date'
 import { NewPlanDialog } from '@/components/plans/NewPlanDialog'
 import { calcContextFor } from '@/lib/nutrition-server'
+import { AiMealButton } from '@/components/ai/AiCreateDialogs'
 
 export async function MealTab({ client, phases }: { client: Client; phases: Phase[] }) {
   const supabase = await createClient()
@@ -20,7 +21,10 @@ export async function MealTab({ client, phases }: { client: Client; phases: Phas
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">Meal plan thuộc từng giai đoạn: mục tiêu calo, đạm, tinh bột, béo và thực đơn theo ngày.</p>
-        <NewPlanDialog kind="meal" phases={phases.map((p) => ({ id: p.id, name: p.name }))} defaultPhase={cur?.id} templates={templates ?? []} calc={calc} />
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <AiMealButton clientId={client.id} phaseId={cur?.id} calc={calc} />
+          <NewPlanDialog kind="meal" phases={phases.map((p) => ({ id: p.id, name: p.name }))} defaultPhase={cur?.id} templates={templates ?? []} calc={calc} />
+        </div>
       </div>
       {phases.map((ph) => {
         const list = (plans ?? []).filter((p) => p.phase_id === ph.id)

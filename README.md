@@ -67,6 +67,7 @@ Script tự gắn nhãn chống chỉ định **cột sống** cho bài dồn t�
 | `DATABASE_URL` | Supabase → nút **Connect** → **Session pooler**. Thay `[YOUR-PASSWORD]` bằng mật khẩu database; ký tự đặc biệt phải mã hoá (`@` → `%40`). Chỉ dùng trên máy để chạy migration / dữ liệu mẫu. | Chỉ trên máy |
 | `GMAIL_USER` | Địa chỉ Gmail dùng để gửi email đăng nhập | Có |
 | `GMAIL_APP_PASSWORD` | Mật khẩu ứng dụng 16 ký tự (xem mục 3) | Có |
+| `GEMINI_API_KEYS` | Key Gemini (https://aistudio.google.com/app/apikey), nhiều key cách nhau dấu phẩy. Dùng cho tạo lịch tập / thực đơn bằng AI | Nên có |
 | `APP_URL` | Địa chỉ app sau khi triển khai, vd `https://urgym.vercel.app` | Khi triển khai |
 | `FM_EMAIL` | Email thật của FM, dùng khi nạp dữ liệu mẫu (mặc định = `GMAIL_USER`) | Không |
 | `SEED_EMAIL` | Hộp thư nhận mã của các tài khoản demo (mặc định = `GMAIL_USER`) | Không |
@@ -93,6 +94,15 @@ Dữ liệu mẫu tạo các tài khoản dùng **"Gmail +"**: mọi email `ten+
 | Khách | `+ha`, `+maianh`, `+tram`, `+hong`, `+huy` | Mỗi khách chỉ thấy hồ sơ của mình |
 | Phụ huynh | `+phuhuynh1` | Thấy bé Gia Na và bé Gia Bin |
 | Phụ huynh | `+phuhuynh2` | Thấy bé Bảo Su |
+
+## Tạo lịch tập & thực đơn bằng AI (thay đổi so với brief, chị chủ duyệt 21/11/2026)
+
+Ở cuối form **Thêm khách** (mục "Lịch tập & thực đơn ban đầu") và trong tab Giáo án / Thực đơn của hồ sơ khách có nút **Tạo bằng AI**:
+
+- **Lịch tập** (theo cách của app training-plan): PT khai báo trình độ, số buổi/tuần, thời lượng, số tuần, dụng cụ, nhóm cơ ưu tiên. AI soạn một tuần mẫu **chỉ từ bài trong Thư viện**, lặp cho đủ số tuần. **Bài có chống chỉ định trùng vùng cảnh báo của khách bị loại khỏi danh sách trước khi gửi cho AI.**
+- **Thực đơn** (giống hệt app diet-plan): AI chọn tên món từ CSDL thực phẩm Việt Nam (526 món), bộ giải tự tính gram cho khớp calo/macro. Để trống mục tiêu thì app tự gợi ý theo cân nặng, chiều cao, tuổi. **Khoá với khách trẻ em và phục hồi chức năng.**
+- Mọi thứ AI tạo ra **chưa chia sẻ** — PT xem lại, chỉnh sửa rồi mới bấm Chia sẻ.
+- Không có `GEMINI_API_KEYS` hoặc AI lỗi: thực đơn dùng danh sách món dự phòng (vẫn qua bộ giải), lịch tập dựng theo quy tắc (chia buổi theo tần suất, chọn bài theo nhóm cơ, vẫn loại bài chống chỉ định).
 
 ## Gợi ý calo & macro (thay đổi so với brief, đã duyệt 20/11/2026)
 
