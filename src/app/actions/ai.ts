@@ -95,7 +95,7 @@ export async function aiCreateWorkoutPlan(clientId: string, rawAnswers: Partial<
         const raw = await generateGeminiJson({ system, prompt, schema: PLAN_SCHEMA, temperature: 0.6, maxOutputTokens: 6000, budgetMs: 45_000 })
         const plan = sanitizePlan(raw, refToEx, answers.sessionsPerWeek)
         if (plan.days.length) { days = plan.days; name = answers.name || plan.name; usedAi = true }
-      } catch { /* chuyển sang dựng theo quy tắc */ }
+      } catch (e) { console.error('[ai/workout] dựng theo quy tắc:', e instanceof Error ? e.message : e) }
     }
     if (!days.length) days = buildFallbackPlan(answers, ctx, library)
     if (!days.length) throw new HttpError(500, 'Không dựng được lịch tập. Vui lòng thử lại.')

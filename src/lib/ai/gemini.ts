@@ -34,6 +34,8 @@ type Options = {
   temperature?: number
   maxOutputTokens?: number
   budgetMs?: number
+  /** Model cho riêng lời gọi này (vd thực đơn dùng bản lite như diet-plan) */
+  model?: string
 }
 
 /** Trả về JSON đã parse; ném GeminiError nếu không gọi được. */
@@ -41,7 +43,7 @@ export async function generateGeminiJson(opts: Options): Promise<unknown> {
   const all = keys()
   if (!all.length) throw new GeminiError('Chưa cấu hình GEMINI_API_KEYS.', 503)
   const deadline = Date.now() + (opts.budgetMs ?? 50_000)
-  const primary = process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL
+  const primary = opts.model || process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL
   const models = primary === FALLBACK_MODEL ? [primary] : [primary, FALLBACK_MODEL]
   const start = cursor++ % all.length
   const ordered = [...all.slice(start), ...all.slice(0, start)]
@@ -64,7 +66,11 @@ export async function generateGeminiJson(opts: Options): Promise<unknown> {
               responseMimeType: 'application/json',
               ...(opts.schema ? { responseJsonSchema: opts.schema } : {}),
               temperature: opts.temperature ?? 0.7,
-              maxOutputTokens: opts.maxOutputTokens ?? 8000,
+              // Phần "suy nghĩ" của model cũng tính vào giới hạn token: để mặc định thì
+              // gemini-3.6-flash có thể nghĩ hết quota rồi trả lời rỗng, lại chậm.
+              // training-plan dùng mức 'low' — đủ tốt cho việc chọn bài / chọn món.
+              maxOutputTokens: (opts.maxOutputTokens ?? 8000) + 2000,
+              thinkingConfig: { thinkingLevel: 'low' },
             },
           }),
           signal: AbortSignal.timeout(Math.min(PER_ATTEMPT_TIMEOUT_MS, remaining - 2_000)),

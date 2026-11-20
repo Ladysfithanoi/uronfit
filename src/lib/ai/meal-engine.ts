@@ -795,10 +795,11 @@ export async function generateMealDay(macros: Macros, mealCount: number, prefere
       system: buildNameOnlySystemInstruction(mealCount, macros, preferences),
       prompt: buildNameOnlyUserPrompt(mealCount),
       temperature: 0.8, maxOutputTokens: 1024, budgetMs: 30_000,
+      model: process.env.GEMINI_MEAL_MODEL?.trim() || 'gemini-3.5-flash-lite', // như diet-plan: việc chọn tên món, bản lite nhanh hơn nhiều
     })
     nameLists = parseNameOnlyResponse(JSON.stringify(raw), mealCount)
     usedAi = !empty(nameLists)
-  } catch { nameLists = null }
+  } catch (e) { console.error('[ai/meal] dùng thực đơn dự phòng:', e instanceof Error ? e.message : e); nameLists = null }
   if (empty(nameLists)) nameLists = buildFallbackNameLists(mealCount, macros)
   const meals = runCoreEngine(nameLists as Record<string, string[]>, macros, mealCount).map(mealSolutionToAiMeal)
   const out: GeneratedMeal[] = meals.map((m, i) => ({ slotIndex: i, dish: m.name, kcal: m.calories, protein: m.protein, fat: m.fat, carbs: m.carbs }))

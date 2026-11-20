@@ -96,7 +96,7 @@ const SYSTEM = `Bạn là huấn luyện viên thể lực dựa trên bằng ch
 LUẬT BẮT BUỘC:
 - CHỈ dùng bài trong THƯ VIỆN, ghi đúng mã (E1, E2…) vào trường "ref". Không bịa bài, không lặp bài trong cùng một buổi.
 - Viết mọi tên buổi, ghi chú bằng tiếng Việt, xưng hô trung tính.
-- Số buổi ("days") đúng bằng số buổi/tuần được yêu cầu. Mỗi buổi có nhãn ngắn phân biệt (vd "Thân dưới A", "Toàn thân 1").
+- Số buổi ("days") đúng bằng số buổi/tuần được yêu cầu. Mỗi buổi có nhãn NGẮN (tối đa 25 ký tự) phân biệt các buổi, vd "Thân dưới A", "Mông & core", "Toàn thân 1". Tên giáo án tối đa 50 ký tự.
 - Số bài mỗi buổi theo thời lượng: 30 phút → 3–4; 45 → 4–5; 60 → 5–6; 75 → 6–7; 90 → 7–8.
 - Thứ tự: khởi động / kích hoạt (nếu có) → bài đa khớp nặng → bài cô lập → core.
 - Mỗi bài: sets 1–5; "reps" là chuỗi như "10" hoặc "8-12"; bài giữ tư thế / cardio dùng "duration_sec" (giây) và để reps = ""; "rest_sec" 30–180.
@@ -165,6 +165,13 @@ export function buildPrompt(answers: WorkoutAnswers, ctx: ClientContext, library
   return { system: SYSTEM, prompt, refToEx }
 }
 
+/** Cắt ở ranh giới từ (không cắt giữa chữ) */
+function shortLabel(s: string, max: number) {
+  if (s.length <= max) return s
+  const cut = s.slice(0, max + 1).replace(/\s+\S*$/, '')
+  return (cut || s.slice(0, max)).replace(/[\s&,:–-]+$/, '')
+}
+
 /** Biến câu trả lời (không tin cậy) của AI thành danh sách buổi hợp lệ. */
 export function sanitizePlan(raw: unknown, refToEx: Map<string, LibraryExercise>, sessions: number) {
   const root = (raw && typeof raw === 'object' ? raw : {}) as { name?: unknown; days?: unknown }
@@ -188,9 +195,9 @@ export function sanitizePlan(raw: unknown, refToEx: Map<string, LibraryExercise>
         rest_sec: clampInt(e.rest_sec, 15, 300, 60), note: txt(e.note, 150) || null,
       })
     }
-    if (exercises.length) days.push({ label: txt(day.label, 40) || `Buổi ${days.length + 1}`, exercises })
+    if (exercises.length) days.push({ label: shortLabel(txt(day.label, 200), 40) || `Buổi ${days.length + 1}`, exercises })
   }
-  return { name: txt(root.name, 80), days, dropped }
+  return { name: shortLabel(txt(root.name, 200), 80), days, dropped }
 }
 
 // ─── Dự phòng: dựng lịch theo quy tắc khi không có AI ────────────────────────
