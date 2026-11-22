@@ -23,8 +23,9 @@ function myExercises(s: PlanSession, clientId: string) {
     .flatMap((e) => { const o = mine.find((m) => m.replaces_id === e.id); return [o ?? e] })
 }
 
-export function PlanViewer({ clientId, name, subtitle, sessions, isGroup }: {
+export function PlanViewer({ clientId, name, subtitle, sessions, isGroup, canSelfTrack = true, canPrint = true }: {
   clientId: string; name: string; subtitle: string; sessions: PlanSession[]; isGroup: boolean
+  /** Theo gói dịch vụ của khách */ canSelfTrack?: boolean; canPrint?: boolean
 }) {
   const [open, setOpen] = useState<string | null>(sessions.find((s) => !s.completed_at)?.id ?? null)
   const [view, setView] = useState<PlanExercise | null>(null)
@@ -41,7 +42,7 @@ export function PlanViewer({ clientId, name, subtitle, sessions, isGroup }: {
     <section>
       <div className="mb-3 flex items-start gap-2">
         <div className="flex-1"><p className="label-caps">{subtitle}</p><h2 className="text-xl font-bold">{name}</h2></div>
-        <Button variant="ghost" size="icon" className="no-print" aria-label="In / Xuất PDF" onClick={() => window.print()}><Printer /></Button>
+        {canPrint && <Button variant="ghost" size="icon" className="no-print" aria-label="In / Xuất PDF" onClick={() => window.print()}><Printer /></Button>}
       </div>
       <ProgressBar done={done} total={sessions.length} className="mb-4" />
       <div ref={topRef} className="scroll-mt-20" />
@@ -83,7 +84,7 @@ export function PlanViewer({ clientId, name, subtitle, sessions, isGroup }: {
                       ))}
                     </ol>
                     {s.comment && <p className="mt-2 rounded-lg bg-secondary p-2 text-sm"><b>HLV nhận xét:</b> {s.comment}</p>}
-                    {s.is_self_training && !isGroup && (
+                    {s.is_self_training && !isGroup && canSelfTrack && (
                       <Button className="no-print mt-3 w-full" variant={s.completed_at ? 'secondary' : 'default'} disabled={pending}
                         onClick={() => start(async () => {
                           const r = await completeSelfSession(s.id, !s.completed_at)

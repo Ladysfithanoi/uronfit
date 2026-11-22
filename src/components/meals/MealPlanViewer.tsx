@@ -7,14 +7,14 @@ import { MacroTargets, DayMeals } from './MealView'
 import type { Meal, MealPlan } from '@/lib/meals'
 import { cn } from '@/lib/utils'
 
-export function MealPlanViewer({ plan, meals, phaseName, todayDay }: { plan: MealPlan; meals: Meal[]; phaseName: string; todayDay: number | null }) {
+export function MealPlanViewer({ plan, meals, phaseName, todayDay, canPrint = true }: { plan: MealPlan; meals: Meal[]; phaseName: string; todayDay: number | null; canPrint?: boolean }) {
   const days = [...new Set(meals.map((m) => m.day_number))].sort((a, b) => a - b)
   const [day, setDay] = useState(todayDay && days.includes(todayDay) ? todayDay : days[0] ?? 1)
   return (
     <section>
       <div className="mb-3 flex items-start gap-2">
         <div className="flex-1"><p className="label-caps">{phaseName}</p><h2 className="text-xl font-bold">{plan.name}</h2></div>
-        <Button variant="ghost" size="icon" className="no-print" aria-label="In / Xuất PDF" onClick={() => window.print()}><Printer /></Button>
+        {canPrint && <Button variant="ghost" size="icon" className="no-print" aria-label="In / Xuất PDF" onClick={() => window.print()}><Printer /></Button>}
       </div>
       <MacroTargets plan={plan} className="mb-4" />
       <div className="no-print -mx-4 mb-3 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:px-0">

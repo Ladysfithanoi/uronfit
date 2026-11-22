@@ -1,4 +1,6 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
+import { ChevronRight, Gem } from 'lucide-react'
 import { requirePageRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -35,6 +37,12 @@ export default async function FmHome() {
         <Stat label="Huấn luyện viên" value={pts?.length ?? 0} />
         <Stat label="Khách trẻ em" value={byGoal.get('kids') ?? 0} />
       </div>
+
+      <Link href="/fm/goi-dich-vu" className="mt-4 flex min-h-14 items-center gap-3 rounded-xl border border-border bg-card px-4 transition-colors hover:bg-secondary">
+        <Gem className="size-5 text-brand" />
+        <span className="flex-1"><span className="block font-medium">Gói dịch vụ & tính năng</span><span className="block text-xs text-muted-foreground">Chọn tính năng khách được dùng theo từng gói</span></span>
+        <ChevronRight className="size-5 text-muted-foreground" />
+      </Link>
 
       <div className="mt-6 grid gap-4 md:grid-cols-3">
         <Breakdown title="Theo PT" rows={(pts ?? []).map((p) => [p.full_name, active.filter((c) => c.pt_id === p.id).length])} />

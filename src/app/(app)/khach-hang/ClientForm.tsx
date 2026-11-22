@@ -24,8 +24,9 @@ import { createMealPlan } from '@/app/(app)/thuc-don/actions'
 
 type StartMode = 'none' | 'ai' | 'manual'
 
-export function ClientForm({ client, pkg, pts, isFm, meId }: {
+export function ClientForm({ client, pkg, pts, isFm, meId, tiers = [] }: {
   client?: Client; pkg?: Package | null; pts: { id: string; full_name: string }[]; isFm: boolean; meId: string
+  tiers?: { id: string; name: string; is_default: boolean }[]
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
@@ -41,6 +42,7 @@ export function ClientForm({ client, pkg, pts, isFm, meId }: {
     height_cm: client?.height_cm ? String(client.height_cm) : '', kid_notes: client?.kid_notes ?? '',
     photo_consent: client?.photo_consent ?? false, avatar_path: client?.avatar_path ?? null,
     package_name: pkg?.name ?? '', package_total: pkg ? String(pkg.total_sessions) : '', package_used: pkg ? String(pkg.used_sessions) : '0',
+    tier_id: client?.tier_id ?? null,
   })
   const set = <K extends keyof ClientInput>(k: K, v: ClientInput[K]) => setF((p) => ({ ...p, [k]: v }))
   const isKid = f.is_kid || f.goals.includes('kids')
@@ -156,6 +158,17 @@ export function ClientForm({ client, pkg, pts, isFm, meId }: {
           </Field>
         </div>
       </Section>
+
+      {isFm && tiers.length > 0 && (
+        <Section title="Gói dịch vụ">
+          <Field label="Gói của khách" htmlFor="tier" hint="Quyết định tính năng khách được dùng trong app (cấu hình ở Gói dịch vụ). Để trống = gói mặc định.">
+            <NativeSelect id="tier" value={f.tier_id ?? ''} onChange={(e) => set('tier_id', e.target.value || null)}>
+              <option value="">— Gói mặc định ({tiers.find((t) => t.is_default)?.name ?? 'đủ tính năng'}) —</option>
+              {tiers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </NativeSelect>
+          </Field>
+        </Section>
+      )}
 
       <Section title="Gói tập">
         <Field label="Tên gói" htmlFor="pkg-name"><Input id="pkg-name" placeholder="Gói 24 buổi" value={f.package_name} onChange={(e) => set('package_name', e.target.value)} /></Field>

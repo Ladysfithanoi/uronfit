@@ -104,6 +104,14 @@ Dữ liệu mẫu tạo các tài khoản dùng **"Gmail +"**: mọi email `ten+
 - Mọi thứ AI tạo ra **chưa chia sẻ** — PT xem lại, chỉnh sửa rồi mới bấm Chia sẻ.
 - Không có `GEMINI_API_KEYS` hoặc AI lỗi: thực đơn dùng danh sách món dự phòng (vẫn qua bộ giải), lịch tập dựng theo quy tắc (chia buổi theo tần suất, chọn bài theo nhóm cơ, vẫn loại bài chống chỉ định).
 
+## Gói dịch vụ — tính năng khách được dùng (thêm 22/11/2026)
+
+FM vào **Gói dịch vụ** (thanh bên trên máy tính, hoặc thẻ ở trang Tổng quan) để tạo các gói và bật/tắt từng tính năng phía khách: xem giáo án · ảnh & video hướng dẫn · tự tick buổi tự tập · xem thực đơn · xem chỉ số & biểu đồ · tự nhập cân nặng/số đo · xem ảnh tiến độ · lời nhắn từ HLV · in / xuất PDF.
+
+- Gán gói trong **Sửa hồ sơ khách** (chỉ FM). Khách chưa gắn gói dùng gói **Mặc định**; phụ huynh nhiều bé — mỗi bé theo gói riêng.
+- Tắt tính năng nào: menu của khách ẩn mục đó, trang hiện thông báo "chưa có trong gói", và **database chặn luôn dữ liệu** (khách gọi thẳng API cũng không đọc/ghi được). HLV không bị ảnh hưởng; PT không đổi được gói.
+- 3 gói gợi ý ban đầu: Cơ bản, Tiêu chuẩn, VIP (mặc định = VIP để khách hiện có không mất tính năng). Kiểm thử: `npx vitest run tests/tiers.test.ts` (tự tạo và tự dọn dữ liệu tạm).
+
 ## Gợi ý calo & macro (thay đổi so với brief, đã duyệt 20/11/2026)
 
 Brief 4.4 ghi app không tự tính calo. Nay bổ sung **công cụ gợi ý cho PT**, dùng cùng công thức với app diet-plan:

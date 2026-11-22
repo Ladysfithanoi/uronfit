@@ -4,9 +4,12 @@ import { requirePageRole } from '@/lib/auth'
 import { ROLE_LABEL, homePath } from '@/lib/labels'
 import { BottomNav, SideNav } from '@/components/layout/AppNav'
 import { LogoutButton } from '@/components/auth/LogoutButton'
+import { portalContext } from '@/lib/portal'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const me = await requirePageRole()
+  // Khách / phụ huynh: menu chỉ hiện tính năng có trong gói dịch vụ của hồ sơ đang xem
+  const features = me.role === 'client' || me.role === 'guardian' ? [...(await portalContext()).features] : undefined
 
   return (
     <div className="min-h-dvh md:flex">
@@ -16,7 +19,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <Image src="/brand/logo.svg" alt="UR Private Gym" width={44} height={44} />
           <span className="text-xs font-bold uppercase tracking-[0.14em]">Private Gym</span>
         </Link>
-        <SideNav role={me.role} />
+        <SideNav role={me.role} features={features} />
         <div className="mt-auto space-y-3">
           <div className="px-2 text-sm">
             <p className="truncate font-semibold">{me.full_name}</p>
@@ -44,7 +47,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <main className="mx-auto w-full max-w-5xl px-4 pb-28 pt-5 md:px-8 md:pb-10 md:pt-8">{children}</main>
       </div>
 
-      <BottomNav role={me.role} />
+      <BottomNav role={me.role} features={features} />
     </div>
   )
 }

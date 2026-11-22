@@ -25,6 +25,7 @@ type PhaseLite = { id: string; name: string; start_date: string; end_date: strin
 export function MetricsView(props: {
   clientId: string; clientName: string; viewer: 'staff' | 'client'; metrics: MetricType[]; optional: MetricType[]
   enabled: string[]; measurements: Measurement[]; phases: PhaseLite[]; photos: Photo[]; photoConsent: boolean
+  canEnter?: boolean; showPhotos?: boolean
 }) {
   const { clientId, viewer, metrics, measurements, phases } = props
   const isStaff = viewer === 'staff'
@@ -44,7 +45,7 @@ export function MetricsView(props: {
 
   return (
     <div className="space-y-6">
-      <EntryForm {...props} />
+      {(isStaff || props.canEnter !== false) && <EntryForm {...props} />}
 
       <section className="rounded-xl border border-border bg-card p-4">
         <h2 className="label-caps mb-3 text-brand">Biểu đồ</h2>
@@ -73,8 +74,8 @@ export function MetricsView(props: {
 
       <PhaseComparison metrics={metrics} byMetric={byMetric} phases={phases} />
       <History {...props} />
-      <PhotoSection key={props.photos.length} clientId={clientId} clientName={props.clientName} photos={props.photos} phases={phases}
-        canEdit={isStaff} consent={props.photoConsent} weights={byMetric.get(metrics.find((m) => m.name === 'Cân nặng')?.id ?? '') ?? []} />
+      {props.showPhotos !== false && <PhotoSection key={props.photos.length} clientId={clientId} clientName={props.clientName} photos={props.photos} phases={phases}
+        canEdit={isStaff} consent={props.photoConsent} weights={byMetric.get(metrics.find((m) => m.name === 'Cân nặng')?.id ?? '') ?? []} />}
       {isStaff && <MetricSettings {...props} />}
     </div>
   )
@@ -180,7 +181,7 @@ function PhaseComparison({ metrics, byMetric, phases }: { metrics: MetricType[];
 }
 
 // ─── Lịch sử đo dạng bảng ───────────────────────────────────────────────────
-function History({ clientId, viewer, metrics, measurements, phases }: Parameters<typeof MetricsView>[0]) {
+function History({ clientId, viewer, metrics, measurements, phases, canEnter }: Parameters<typeof MetricsView>[0]) {
   const [pending, start] = useTransition()
   const dates = [...new Set(measurements.map((m) => m.measured_on))].sort().reverse()
   const paged = usePaged(dates, 10)
@@ -222,7 +223,7 @@ function History({ clientId, viewer, metrics, measurements, phases }: Parameters
                     {byStaff && <Badge variant="secondary">HLV</Badge>} {byClient && <Badge variant="outline">Khách</Badge>}
                   </td>
                   <td className="py-2 text-right">
-                    {(viewer === 'staff' || byClient) && (
+                    {(viewer === 'staff' || (byClient && canEnter !== false)) && (
                       <Button size="icon-sm" variant="ghost" aria-label={`Xoá số đo ngày ${formatDate(d)}`} disabled={pending}
                         onClick={async () => {
                           if (!(await confirmDialog({ title: `Xoá số đo ngày ${formatDate(d)}?`, description: viewer === 'staff' ? 'Xoá toàn bộ chỉ số đã nhập trong ngày này.' : 'Chỉ xoá các số bạn tự nhập; số do HLV nhập vẫn giữ.', destructive: true }))) return

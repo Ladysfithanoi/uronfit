@@ -3,13 +3,14 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  CalendarCheck, ChartLine, CircleUser, Dumbbell, House, LayoutDashboard,
+  CalendarCheck, ChartLine, CircleUser, Dumbbell, Gem, House, LayoutDashboard,
   UserCog, Users, UsersRound, Utensils, type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { UserRole } from '@/lib/types'
 
-type Item = { href: string; label: string; icon: LucideIcon }
+// feature: mục của khách chỉ hiện khi gói có tính năng đó; desktopOnly: chỉ ở thanh bên máy tính
+type Item = { href: string; label: string; icon: LucideIcon; feature?: string; desktopOnly?: boolean }
 
 const NAV: Record<UserRole, Item[]> = {
   fm: [
@@ -17,6 +18,7 @@ const NAV: Record<UserRole, Item[]> = {
     { href: '/khach-hang', label: 'Khách hàng', icon: Users },
     { href: '/thu-vien', label: 'Thư viện', icon: Dumbbell },
     { href: '/fm/nhan-su', label: 'Nhân sự', icon: UserCog },
+    { href: '/fm/goi-dich-vu', label: 'Gói dịch vụ', icon: Gem, desktopOnly: true },
     { href: '/tai-khoan', label: 'Tài khoản', icon: CircleUser },
   ],
   pt: [
@@ -28,9 +30,9 @@ const NAV: Record<UserRole, Item[]> = {
   ],
   client: [
     { href: '/me', label: 'Trang chủ', icon: House },
-    { href: '/me/giao-an', label: 'Giáo án', icon: Dumbbell },
-    { href: '/me/thuc-don', label: 'Thực đơn', icon: Utensils },
-    { href: '/me/chi-so', label: 'Chỉ số', icon: ChartLine },
+    { href: '/me/giao-an', label: 'Giáo án', icon: Dumbbell, feature: 'workout_view' },
+    { href: '/me/thuc-don', label: 'Thực đơn', icon: Utensils, feature: 'meal_view' },
+    { href: '/me/chi-so', label: 'Chỉ số', icon: ChartLine, feature: 'metrics_view' },
     { href: '/tai-khoan', label: 'Tài khoản', icon: CircleUser },
   ],
   guardian: [],
@@ -47,13 +49,16 @@ function useActive() {
 }
 
 /** Thanh điều hướng dưới đáy (điện thoại) */
-export function BottomNav({ role }: { role: UserRole }) {
+const visible = (role: UserRole, features?: string[]) =>
+  NAV[role].filter((i) => !i.feature || !features || features.includes(i.feature))
+
+export function BottomNav({ role, features }: { role: UserRole; features?: string[] }) {
   const isActive = useActive()
   return (
     <nav aria-label="Điều hướng chính"
       className="no-print pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-border bg-black/95 backdrop-blur md:hidden">
-      <ul className="mx-auto grid max-w-lg grid-cols-5">
-        {NAV[role].map(({ href, label, icon: Icon }) => {
+      <ul className="mx-auto flex max-w-lg [&>li]:flex-1">
+        {visible(role, features).filter((i) => !i.desktopOnly).map(({ href, label, icon: Icon }) => {
           const active = isActive(href)
           return (
             <li key={href}>
@@ -72,11 +77,11 @@ export function BottomNav({ role }: { role: UserRole }) {
 }
 
 /** Thanh bên (máy tính) */
-export function SideNav({ role }: { role: UserRole }) {
+export function SideNav({ role, features }: { role: UserRole; features?: string[] }) {
   const isActive = useActive()
   return (
     <nav aria-label="Điều hướng chính" className="flex flex-col gap-1">
-      {NAV[role].map(({ href, label, icon: Icon }) => {
+      {visible(role, features).map(({ href, label, icon: Icon }) => {
         const active = isActive(href)
         return (
           <Link key={href} href={href} aria-current={active ? 'page' : undefined}

@@ -15,7 +15,7 @@ import { exerciseLine } from '@/components/plans/format'
 export const metadata: Metadata = { title: 'Trang chủ' }
 
 export default async function ClientHome() {
-  const { me, clients, client, phases } = await portalContext()
+  const { me, clients, client, phases, tier, features } = await portalContext()
   if (!client) {
     return <><PageHeader title={`Xin chào, ${me.full_name}`} /><p className="text-sm text-muted-foreground">Chưa có hồ sơ nào được gắn với tài khoản này. Vui lòng liên hệ HLV.</p></>
   }
@@ -50,7 +50,7 @@ export default async function ClientHome() {
 
   return (
     <>
-      <PageHeader eyebrow={me.role === 'guardian' ? 'Phụ huynh' : 'Khách hàng'} title={me.role === 'guardian' ? client.full_name : `Xin chào, ${me.full_name}`} />
+      <PageHeader eyebrow={`${me.role === 'guardian' ? 'Phụ huynh' : 'Khách hàng'}${tier ? ` · Gói ${tier.name}` : ''}`} title={me.role === 'guardian' ? client.full_name : `Xin chào, ${me.full_name}`} />
       <KidSwitcher clients={clients} activeId={client.id} basePath="/me" />
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -67,7 +67,7 @@ export default async function ClientHome() {
           {left !== null && <p className={`mt-3 text-sm ${left <= 3 ? 'font-semibold text-warning' : 'text-muted-foreground'}`}>Gói tập còn {left} buổi</p>}
         </section>
 
-        <section className="rounded-xl border border-border bg-card p-4">
+        {features.has('workout_view') && <section className="rounded-xl border border-border bg-card p-4">
           <p className="label-caps flex items-center gap-1.5"><Dumbbell className="size-4 text-brand" /> Buổi tập kế tiếp</p>
           {next ? (
             <>
@@ -80,9 +80,9 @@ export default async function ClientHome() {
               <Link href="/me/giao-an" className="mt-3 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-brand">Xem giáo án <ChevronRight className="size-4" /></Link>
             </>
           ) : <p className="mt-1 text-sm text-muted-foreground">{plans.length ? 'Đã hoàn thành mọi buổi trong giáo án hiện tại.' : 'HLV chưa chia sẻ giáo án.'}</p>}
-        </section>
+        </section>}
 
-        <section className="rounded-xl border border-border bg-card p-4 md:col-span-2">
+        {features.has('meal_view') && <section className="rounded-xl border border-border bg-card p-4 md:col-span-2">
           <p className="label-caps flex items-center gap-1.5"><Utensils className="size-4 text-brand" /> Thực đơn hôm nay {mealPlan && <span className="normal-case tracking-normal">· Ngày {dayNo}</span>}</p>
           {mealPlan ? (
             <>
@@ -96,9 +96,9 @@ export default async function ClientHome() {
               <Link href="/me/thuc-don" className="mt-2 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-brand">Xem cả thực đơn <ChevronRight className="size-4" /></Link>
             </>
           ) : <p className="mt-1 text-sm text-muted-foreground">HLV chưa chia sẻ thực đơn.</p>}
-        </section>
+        </section>}
 
-        {notes && notes.length > 0 && (
+        {features.has('coach_notes') && notes && notes.length > 0 && (
           <section className="rounded-xl border border-border bg-card p-4 md:col-span-2">
             <p className="label-caps flex items-center gap-1.5"><MessageSquare className="size-4 text-brand" /> Lời nhắn từ HLV</p>
             <ul className="mt-2 space-y-2 text-sm">{notes.map((n) => <li key={n.id} className="whitespace-pre-line"><span className="text-xs text-muted-foreground">{formatDate(n.created_at)}</span><br />{n.content}</li>)}</ul>

@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { portalContext } from '@/lib/portal'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { KidSwitcher } from '@/components/portal/KidSwitcher'
+import { FeatureLocked } from '@/components/portal/FeatureLocked'
 import { MealPlanViewer } from '@/components/meals/MealPlanViewer'
 import { currentPhase } from '@/lib/clients'
 import { todayVN } from '@/lib/date'
@@ -11,8 +12,11 @@ import { todayDayNumber, type Meal, type MealPlan } from '@/lib/meals'
 export const metadata: Metadata = { title: 'Thực đơn' }
 
 export default async function MyMealsPage() {
-  const { clients, client, phases } = await portalContext()
+  const { clients, client, phases, tier, features } = await portalContext()
   if (!client) return <PageHeader title="Thực đơn" description="Chưa có hồ sơ." />
+  if (!features.has('meal_view')) {
+    return <><PageHeader title="Thực đơn" /><KidSwitcher clients={clients} activeId={client.id} basePath="/me/thuc-don" /><FeatureLocked feature="Xem thực đơn" tierName={tier?.name} /></>
+  }
   const supabase = await createClient()
   const ids = phases.map((p) => p.id)
   // RLS: khách chỉ nhận thực đơn đã được chia sẻ
@@ -37,7 +41,7 @@ export default async function MyMealsPage() {
           const phase = phases.find((x) => x.id === p.phase_id)
           return (
             <MealPlanViewer key={p.id} plan={p as MealPlan} meals={list} phaseName={phase?.name ?? ''}
-              todayDay={p.phase_id === cur?.id ? todayDayNumber(days, phase?.start_date ?? today, today) : null} />
+              todayDay={p.phase_id === cur?.id ? todayDayNumber(days, phase?.start_date ?? today, today) : null} canPrint={features.has('print_pdf')} />
           )
         })}
       </div>

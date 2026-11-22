@@ -1,14 +1,16 @@
 import 'server-only'
+import { cache } from 'react'
 import { cookies } from 'next/headers'
 import { requirePageRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { CLIENT_COLUMNS, type Client, type Phase } from '@/lib/clients'
+import { featuresOf, tierFor, type Tier } from '@/lib/features'
 
 /**
  * Ngữ cảnh cổng khách hàng. RLS chỉ trả về hồ sơ của chính khách, hoặc các bé của
  * phụ huynh. Phụ huynh nhiều bé chọn bé (lưu ở cookie urg_be); id lạ → rơi về bé đầu tiên.
  */
-export async function portalContext() {
+export const portalContext = cache(async () => {
   const be = (await cookies()).get('urg_be')?.value
   const me = await requirePageRole('client', 'guardian')
   const supabase = await createClient()
@@ -18,8 +20,12 @@ export async function portalContext() {
   const { data: phases } = client
     ? await supabase.from('phases').select('*').eq('client_id', client.id).order('sort_order')
     : { data: [] }
-  return { me, clients, client, phases: (phases ?? []) as Phase[] }
-}
+  // Gói dịch vụ của hồ sơ đang xem → tính năng được dùng (RLS cũng chặn ở database)
+  const { data: tiers } = await supabase.from('service_tiers').select('*').order('sort_order')
+  const tier = client ? tierFor(client.tier_id, (tiers ?? []) as Tier[]) : null
+  const features = featuresOf(tier, (tiers ?? []).length > 0)
+  return { me, clients, client, phases: (phases ?? []) as Phase[], tier, features }
+})
 
 /** Id các giáo án ĐÃ CHIA SẺ mà khách xem được: cá nhân (theo giai đoạn) + nhóm */
 export async function sharedPlanIds(clientId: string, phaseIds: string[]) {

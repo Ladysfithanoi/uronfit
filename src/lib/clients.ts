@@ -25,6 +25,7 @@ export type Client = {
   kid_notes: string | null
   enabled_metrics: string[]
   photo_consent: boolean
+  tier_id: string | null
 }
 
 export type Package = { id: string; name: string; total_sessions: number; used_sessions: number; is_active: boolean; start_date: string }
@@ -35,7 +36,7 @@ export type Phase = {
 }
 
 export const CLIENT_COLUMNS =
-  'id, full_name, gender, birth_date, phone, avatar_path, start_date, goals, training_type, pt_id, status, injuries, surgeries, joint_conditions, doctor_orders, avoid_movements, health_flags, is_kid, guardian_name, guardian_phone, height_cm, kid_notes, enabled_metrics, photo_consent'
+  'id, full_name, gender, birth_date, phone, avatar_path, start_date, goals, training_type, pt_id, status, injuries, surgeries, joint_conditions, doctor_orders, avoid_movements, health_flags, is_kid, guardian_name, guardian_phone, height_cm, kid_notes, enabled_metrics, photo_consent, tier_id'
 
 export function activePackage(pkgs: Package[] | null | undefined): Package | null {
   return (pkgs ?? []).filter((p) => p.is_active).sort((a, b) => (a.start_date < b.start_date ? 1 : -1))[0] ?? null

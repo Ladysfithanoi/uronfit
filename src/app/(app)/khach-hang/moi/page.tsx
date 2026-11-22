@@ -14,12 +14,13 @@ export const metadata: Metadata = { title: 'Thêm khách' }
 export default async function NewClientPage() {
   const me = await requirePageRole('fm', 'pt')
   const supabase = await createClient()
+  const { data: tiers } = await supabase.from('service_tiers').select('id, name, is_default').order('sort_order')
   const { data: pts } = await supabase.from('profiles').select('id, full_name').eq('role', 'pt').eq('is_active', true).order('full_name')
   return (
     <div className="max-w-2xl">
       <Link href="/khach-hang" className="mb-3 inline-flex min-h-11 items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ChevronLeft className="size-4" /> Khách hàng</Link>
       <PageHeader eyebrow="Khách hàng" title="Thêm khách mới" />
-      <ClientForm pts={pts ?? []} isFm={me.role === 'fm'} meId={me.id} />
+      <ClientForm pts={pts ?? []} isFm={me.role === 'fm'} meId={me.id} tiers={tiers ?? []} />
     </div>
   )
 }

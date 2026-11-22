@@ -13,7 +13,7 @@ export type ClientInput = {
   goals: GoalGroup[]; training_type: TrainingType; pt_id: string | null; status: ClientStatus
   injuries: string; surgeries: string; joint_conditions: string; doctor_orders: string; avoid_movements: string
   health_flags: string[]; is_kid: boolean; guardian_name: string; guardian_phone: string; height_cm: string; kid_notes: string
-  photo_consent: boolean; avatar_path: string | null
+  photo_consent: boolean; avatar_path: string | null; tier_id?: string | null
   package_name: string; package_total: string; package_used: string
 }
 
@@ -36,6 +36,8 @@ export async function saveClient(input: ClientInput, id?: string) {
       is_kid: isKid, guardian_name: isKid ? t(input.guardian_name) : null, guardian_phone: isKid ? t(input.guardian_phone) : null,
       height_cm: parseDecimal(input.height_cm), kid_notes: isKid ? t(input.kid_notes) : null,
       photo_consent: input.photo_consent, avatar_path: input.avatar_path,
+      // Gói dịch vụ: chỉ FM đặt (trigger ở database cũng chặn PT)
+      ...(me.role === 'fm' ? { tier_id: input.tier_id || null } : {}),
     }
 
     let clientId = id

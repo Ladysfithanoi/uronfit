@@ -2,15 +2,18 @@ import { createClient } from '@/lib/supabase/server'
 import { formatDate } from '@/lib/date'
 import { HEALTH_FLAG_LABEL } from '@/lib/labels'
 import { fmtNum } from '@/lib/num'
+import { tierFor, type Tier } from '@/lib/features'
 import type { Client, Package } from '@/lib/clients'
 import { AccountsPanel, PackagePanel, DeleteClientButton } from './OverviewClient'
 
 export async function OverviewTab({ client: c, pkg, pkgs, isFm }: { client: Client; pkg: Package | null; pkgs: Package[]; isFm: boolean }) {
   const supabase = await createClient()
-  const [{ data: access }, { data: pt }] = await Promise.all([
+  const [{ data: access }, { data: pt }, { data: tiers }] = await Promise.all([
     supabase.from('client_access').select('relation, profiles(id, full_name, email, is_active)').eq('client_id', c.id),
     c.pt_id ? supabase.from('profiles').select('full_name').eq('id', c.pt_id).maybeSingle() : Promise.resolve({ data: null }),
+    supabase.from('service_tiers').select('*').order('sort_order'),
   ])
+  const tier = tierFor(c.tier_id, (tiers ?? []) as Tier[])
   const accounts = (access ?? []).flatMap((a) => {
     const p = a.profiles as unknown as { id: string; full_name: string; email: string; is_active: boolean } | null
     return p ? [{ ...p, relation: a.relation as 'self' | 'guardian' }] : []
@@ -20,6 +23,7 @@ export async function OverviewTab({ client: c, pkg, pkgs, isFm }: { client: Clie
     <div className="grid gap-4 md:grid-cols-2">
       <Card title="Thông tin">
         <Info label="PT phụ trách" value={pt?.full_name ?? 'Chưa gán'} />
+        <Info label="Gói dịch vụ" value={tier ? `${tier.name}${c.tier_id ? '' : ' (mặc định)'}` : 'Đủ tính năng'} />
         <Info label="Ngày sinh" value={formatDate(c.birth_date)} />
         <Info label="Điện thoại" value={c.phone ?? '—'} />
         <Info label="Chiều cao" value={c.height_cm ? `${fmtNum(Number(c.height_cm))} cm` : null} />
