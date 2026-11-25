@@ -15,6 +15,7 @@ Quyết định đã đổi so với brief (người dùng duyệt 20/11/2026):
 - Giữ KHÔNG mật khẩu (người dùng chốt lại 20/11). Mục Tài khoản: mọi vai trò tự sửa họ tên + SĐT; chỉ FM đổi email (mã 6 số gửi tới email mới, báo email cũ; bảng `email_change_requests` chỉ service role).
 - Tạo lịch tập & thực đơn bằng AI (Gemini, env GEMINI_API_KEYS) — `src/lib/ai/`: workout.ts (theo training-plan; loại bài chống chỉ định TRƯỚC khi gửi AI; dự phòng theo quy tắc), meal-engine.ts + foods-data.ts (chép nguyên bộ giải diet-plan; khoá trẻ em & phục hồi). Nút ở cuối form Thêm khách và tab Giáo án/Thực đơn; kết quả không tự chia sẻ.
 - Gói dịch vụ (migration 011, `src/lib/features.ts`): FM bật/tắt tính năng phía khách theo gói; chặn ở RLS qua `portal_allows(cid, feat)` / `client_has_feature`; trang `/fm/goi-dich-vu`; chỉ FM đổi tier_id (trigger). Tính năng mới phía khách phải có mã trong FEATURES + kiểm tra ở cả RLS lẫn trang `/me`.
+- Tập 1:2: form khách có bảng phụ người thứ 2 (PartnerPanel, saveClientPair — lỗi thì hoàn tác); bảng theo dõi song song ở nhom/[id] (PairBoard) CHỈ dành cho HLV, hai khách không được thấy dữ liệu của nhau.
 - Thư viện bài tập nhập thêm từ app training-plan bằng `npm run import:exercises` (chỉ đọc nguồn, idempotent).
 
 Quy ước:

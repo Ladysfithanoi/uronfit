@@ -9,6 +9,8 @@ import { NewPlanDialog } from '@/components/plans/NewPlanDialog'
 import { PlanLink } from '@/app/(app)/khach-hang/[id]/tabs/WorkoutTab'
 import { activePackage, type Package } from '@/lib/clients'
 import { GroupForm } from '../GroupForm'
+import { PairBoard } from './PairBoard'
+import { loadPairBoard } from './pair-data'
 import { DeleteGroup } from './DeleteGroup'
 
 export const metadata: Metadata = { title: 'Nhóm tập' }
@@ -30,6 +32,7 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
     supabase.from('clients').select('id, full_name, is_kid, training_type, pt_id').eq('status', 'active').order('full_name'),
     supabase.from('profiles').select('id, full_name').eq('role', 'pt').eq('is_active', true).order('full_name'),
   ])
+  const board = g.type === 'one_on_two' ? await loadPairBoard(members.map((m) => m.id)) : null
   const sessions = (plans ?? []).flatMap((p) => p.workout_sessions ?? [])
 
   return (
@@ -58,6 +61,8 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
           })}
         </ul>
       </section>
+
+      {board && board.length > 0 && <PairBoard people={board} />}
 
       <section>
         <div className="mb-2 flex items-center justify-between gap-2">

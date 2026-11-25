@@ -19,48 +19,125 @@ export type ClientInput = {
 
 const t = (s: string | null | undefined) => (s?.trim() ? s.trim() : null)
 
+type Db = Awaited<ReturnType<typeof createClient>>
+
+function checkClient(input: ClientInput, who = '') {
+  if (!input.full_name?.trim()) throw new HttpError(400, `Vui lòng nhập họ tên${who}.`)
+  if (!input.goals.length) throw new HttpError(400, `Chọn ít nhất một nhóm mục tiêu${who}.`)
+}
+
+/** Ghi hồ sơ + gói tập. onCreated gọi ngay khi dòng khách được tạo (để hoàn tác nếu bước sau lỗi). */
+async function writeClient(supabase: Db, me: { id: string; role: string }, input: ClientInput, id?: string, onCreated?: (id: string) => void) {
+  const isKid = input.is_kid || input.goals.includes('kids')
+  const row = {
+    full_name: input.full_name.trim(), gender: input.gender, birth_date: input.birth_date || null,
+    phone: t(input.phone), start_date: input.start_date, goals: input.goals, training_type: input.training_type,
+    // PT chỉ tạo khách cho chính mình (RLS cũng chặn)
+    pt_id: me.role === 'pt' ? me.id : input.pt_id, status: input.status,
+    injuries: t(input.injuries), surgeries: t(input.surgeries), joint_conditions: t(input.joint_conditions),
+    doctor_orders: t(input.doctor_orders), avoid_movements: t(input.avoid_movements), health_flags: input.health_flags,
+    is_kid: isKid, guardian_name: isKid ? t(input.guardian_name) : null, guardian_phone: isKid ? t(input.guardian_phone) : null,
+    height_cm: parseDecimal(input.height_cm), kid_notes: isKid ? t(input.kid_notes) : null,
+    photo_consent: input.photo_consent, avatar_path: input.avatar_path,
+    // Gói dịch vụ: chỉ FM đặt (trigger ở database cũng chặn PT)
+    ...(me.role === 'fm' ? { tier_id: input.tier_id || null } : {}),
+  }
+
+  let clientId = id
+  if (id) {
+    const res = await supabase.from('clients').update(row).eq('id', id).select('id')
+    if (!must(res)?.length) throw new HttpError(403, 'Bạn không có quyền sửa hồ sơ này.')
+  } else {
+    clientId = must(await supabase.from('clients').insert({ ...row, created_by: me.id }).select('id').single()).id
+    onCreated?.(clientId!)
+  }
+
+  // Gói tập
+  const total = parseIntOrNull(input.package_total)
+  if (total && total > 0) {
+    const used = Math.max(0, parseIntOrNull(input.package_used) ?? 0)
+    const { data: pkg } = await supabase.from('client_packages').select('id').eq('client_id', clientId!).eq('is_active', true)
+      .order('start_date', { ascending: false }).limit(1).maybeSingle()
+    const pkgRow = { name: t(input.package_name) ?? 'Gói tập', total_sessions: total, used_sessions: used }
+    if (pkg) must(await supabase.from('client_packages').update(pkgRow).eq('id', pkg.id))
+    else must(await supabase.from('client_packages').insert({ ...pkgRow, client_id: clientId! }))
+  }
+  return clientId!
+}
+
 export async function saveClient(input: ClientInput, id?: string) {
   return run(async () => {
     const me = await requireApiRole('fm', 'pt')
-    if (!input.full_name?.trim()) throw new HttpError(400, 'Vui lòng nhập họ tên.')
-    if (!input.goals.length) throw new HttpError(400, 'Chọn ít nhất một nhóm mục tiêu.')
-    const supabase = await createClient()
-    const isKid = input.is_kid || input.goals.includes('kids')
-    const row = {
-      full_name: input.full_name.trim(), gender: input.gender, birth_date: input.birth_date || null,
-      phone: t(input.phone), start_date: input.start_date, goals: input.goals, training_type: input.training_type,
-      // PT chỉ tạo khách cho chính mình (RLS cũng chặn)
-      pt_id: me.role === 'pt' ? me.id : input.pt_id, status: input.status,
-      injuries: t(input.injuries), surgeries: t(input.surgeries), joint_conditions: t(input.joint_conditions),
-      doctor_orders: t(input.doctor_orders), avoid_movements: t(input.avoid_movements), health_flags: input.health_flags,
-      is_kid: isKid, guardian_name: isKid ? t(input.guardian_name) : null, guardian_phone: isKid ? t(input.guardian_phone) : null,
-      height_cm: parseDecimal(input.height_cm), kid_notes: isKid ? t(input.kid_notes) : null,
-      photo_consent: input.photo_consent, avatar_path: input.avatar_path,
-      // Gói dịch vụ: chỉ FM đặt (trigger ở database cũng chặn PT)
-      ...(me.role === 'fm' ? { tier_id: input.tier_id || null } : {}),
-    }
-
-    let clientId = id
-    if (id) {
-      const res = await supabase.from('clients').update(row).eq('id', id).select('id')
-      if (!must(res)?.length) throw new HttpError(403, 'Bạn không có quyền sửa hồ sơ này.')
-    } else {
-      clientId = must(await supabase.from('clients').insert({ ...row, created_by: me.id }).select('id').single()).id
-    }
-
-    // Gói tập
-    const total = parseIntOrNull(input.package_total)
-    if (total && total > 0) {
-      const used = Math.max(0, parseIntOrNull(input.package_used) ?? 0)
-      const { data: pkg } = await supabase.from('client_packages').select('id').eq('client_id', clientId!).eq('is_active', true)
-        .order('start_date', { ascending: false }).limit(1).maybeSingle()
-      const pkgRow = { name: t(input.package_name) ?? 'Gói tập', total_sessions: total, used_sessions: used }
-      if (pkg) must(await supabase.from('client_packages').update(pkgRow).eq('id', pkg.id))
-      else must(await supabase.from('client_packages').insert({ ...pkgRow, client_id: clientId! }))
-    }
-
+    checkClient(input)
+    const clientId = await writeClient(await createClient(), me, input, id)
     revalidatePath('/khach-hang', 'layout')
-    return { id: clientId! }
+    return { id: clientId }
+  })
+}
+
+// ─── Tập 1:2: người thứ 2 + nhóm ────────────────────────────────────────────
+export type PartnerInput = { mode: 'new'; input: ClientInput } | { mode: 'existing'; id: string }
+
+async function inPair(supabase: Db, clientId: string) {
+  const rows = must(await supabase.from('group_members').select('client_id, groups!inner(type)').eq('client_id', clientId).eq('groups.type', 'one_on_two'))
+  return rows.length > 0
+}
+
+const shortName = (n: string) => n.trim().split(/\s+/).pop() ?? n
+
+/** Tạo / gắn người thứ 2 và lập nhóm 1:2. created ghi lại id vừa tạo để hoàn tác khi lỗi. */
+async function joinPair(supabase: Db, me: { id: string; role: string }, clientId: string, partner: PartnerInput, created: { clients: string[]; groups: string[] }) {
+  const first = must(await supabase.from('clients').select('full_name, pt_id, is_kid').eq('id', clientId).single())
+  if (first.is_kid) throw new HttpError(400, 'Khách trẻ em tập theo nhóm trẻ em, không lập nhóm 1:2.')
+  if (await inPair(supabase, clientId)) throw new HttpError(409, 'Khách này đã thuộc một nhóm 1:2.')
+
+  let partnerId: string, partnerName: string
+  if (partner.mode === 'new') {
+    partnerId = await writeClient(supabase, me, { ...partner.input, training_type: 'one_on_two', pt_id: first.pt_id, is_kid: false, avatar_path: null },
+      undefined, (id) => created.clients.push(id))
+    partnerName = partner.input.full_name
+  } else {
+    if (partner.id === clientId) throw new HttpError(400, 'Hãy chọn một khách khác làm người thứ 2.')
+    const { data: p } = await supabase.from('clients').select('id, full_name, pt_id, is_kid').eq('id', partner.id).maybeSingle()
+    if (!p || p.is_kid) throw new HttpError(400, 'Khách được chọn không phù hợp để tập 1:2.')
+    if (p.pt_id !== first.pt_id) throw new HttpError(400, 'Hai người tập 1:2 phải cùng PT phụ trách.')
+    if (await inPair(supabase, p.id)) throw new HttpError(409, `${p.full_name} đã thuộc một nhóm 1:2 khác.`)
+    partnerId = p.id
+    partnerName = p.full_name
+  }
+
+  const groupId: string = must(await supabase.from('groups').insert({
+    name: `1:2 · ${shortName(first.full_name)} & ${shortName(partnerName)}`, type: 'one_on_two', pt_id: first.pt_id,
+  }).select('id').single()).id
+  created.groups.push(groupId)
+  must(await supabase.from('group_members').insert([clientId, partnerId].map((client_id) => ({ group_id: groupId, client_id }))))
+  if (partner.mode === 'existing') must(await supabase.from('clients').update({ training_type: 'one_on_two' }).eq('id', partnerId))
+  return { partnerId, groupId }
+}
+
+/** Lưu khách 1:2 cùng người thứ 2. Lỗi giữa chừng → xoá đúng những dòng vừa tạo trong lần gọi này. */
+export async function saveClientPair(input: ClientInput, partner: PartnerInput, id?: string) {
+  return run(async () => {
+    const me = await requireApiRole('fm', 'pt')
+    checkClient(input)
+    if (partner.mode === 'new') {
+      checkClient(partner.input, ' của người thứ 2')
+      if (partner.input.goals.includes('kids')) throw new HttpError(400, 'Người thứ 2 không thể thuộc nhóm trẻ em.')
+    }
+    const supabase = await createClient()
+    const created = { clients: [] as string[], groups: [] as string[] }
+    try {
+      const clientId = await writeClient(supabase, me, { ...input, training_type: 'one_on_two' }, id, (x) => created.clients.push(x))
+      const r = await joinPair(supabase, me, clientId, partner, created)
+      revalidatePath('/khach-hang', 'layout')
+      revalidatePath('/nhom', 'layout')
+      return { id: clientId, ...r }
+    } catch (e) {
+      const admin = createAdminClient()
+      if (created.groups.length) await admin.from('groups').delete().in('id', created.groups)
+      if (created.clients.length) await admin.from('clients').delete().in('id', created.clients)
+      throw e
+    }
   })
 }
 

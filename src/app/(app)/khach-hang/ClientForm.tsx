@@ -15,7 +15,12 @@ import { CLIENT_STATUS_LABEL, GOAL_LABEL, HEALTH_FLAG_LABEL, TRAINING_TYPE_LABEL
 import { todayVN } from '@/lib/date'
 import type { Client, Package } from '@/lib/clients'
 import type { GoalGroup, TrainingType, ClientStatus, Gender } from '@/lib/types'
-import { saveClient, setClientAvatar, type ClientInput } from './actions'
+import { saveClient, saveClientPair, setClientAvatar, type ClientInput, type PartnerInput } from './actions'
+import Link from 'next/link'
+import { PairMetricsFields, PartnerPanel, blankPartner, type PartnerMode } from './PartnerPanel'
+import { saveMeasurements } from '@/app/actions/metrics'
+import type { MetricType } from '@/lib/metrics'
+import type { PairCandidate, PairInfo } from '@/lib/pairs'
 import { Sparkles } from 'lucide-react'
 import { AiMealFields, AiWorkoutFields, defaultMeal, defaultWorkout, type MealForm, type WorkoutForm } from '@/components/ai/AiFields'
 import { aiCreateMealPlan, aiCreateWorkoutPlan, ensureFirstPhase, recordInitialWeight } from '@/app/actions/ai'
@@ -24,9 +29,11 @@ import { createMealPlan } from '@/app/(app)/thuc-don/actions'
 
 type StartMode = 'none' | 'ai' | 'manual'
 
-export function ClientForm({ client, pkg, pts, isFm, meId, tiers = [] }: {
+export function ClientForm({ client, pkg, pts, isFm, meId, tiers = [], pair = null, candidates = [], metricTypes = [] }: {
   client?: Client; pkg?: Package | null; pts: { id: string; full_name: string }[]; isFm: boolean; meId: string
   tiers?: { id: string; name: string; is_default: boolean }[]
+  /** Nhóm 1:2 hiện có của khách; danh sách khách có thể ghép; bộ chỉ số chung */
+  pair?: PairInfo | null; candidates?: PairCandidate[]; metricTypes?: MetricType[]
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
@@ -53,6 +60,17 @@ export function ClientForm({ client, pkg, pts, isFm, meId, tiers = [] }: {
   const [wf, setWf] = useState<WorkoutForm>(defaultWorkout)
   const [mf, setMf] = useState<MealForm>(defaultMeal)
   const [step, setStep] = useState('')
+  // Tập 1:2 — người thứ 2 + chỉ số ban đầu của cả hai
+  const [pMode, setPMode] = useState<PartnerMode>(isNew ? 'new' : 'later')
+  const [p2, setP2] = useState<ClientInput>(blankPartner)
+  const [p2Id, setP2Id] = useState('')
+  const [m1, setM1] = useState<Record<string, string>>({})
+  const [m2, setM2] = useState<Record<string, string>>({})
+  const isPair = f.training_type === 'one_on_two'
+  const showPartner = isPair && !isKid && !pair
+  const eligible = candidates.filter((c) => c.pt_id === f.pt_id)
+  const partner2 = eligible.find((c) => c.id === p2Id)
+  const withPartner = showPartner && pMode !== 'later'
   const mealAiBlocked = isKid ? 'Khách trẻ em: không tạo thực đơn tự động.' : f.goals.includes('rehab') ? 'Khách phục hồi chức năng: không tạo thực đơn tự động.' : null
 
   /** Sau khi tạo hồ sơ: cân nặng ban đầu → lịch tập → thực đơn. Lỗi từng bước không chặn các bước sau. */
@@ -86,12 +104,27 @@ export function ClientForm({ client, pkg, pts, isFm, meId, tiers = [] }: {
     return tab
   }
 
+  /** Chỉ số ban đầu (ngày hôm nay); lỗi ở bước này không làm mất hồ sơ vừa tạo */
+  async function saveInitial(id: string, values: Record<string, string>) {
+    const entries = Object.entries(values).filter(([, v]) => v.trim()).map(([metric_type_id, value]) => ({ metric_type_id, value }))
+    if (!entries.length) return
+    const ph = await ensureFirstPhase(id, wf.weeks)
+    const r = ph.ok ? await saveMeasurements(id, todayVN(), entries) : ph
+    if (!r.ok) toast.error(`Chỉ số ban đầu: ${r.error}`)
+  }
+
   function submit(e: React.FormEvent) {
     e.preventDefault()
     if (isNew && mMode === 'ai' && mealAiBlocked) { toast.error(mealAiBlocked); return }
+    if (withPartner) {
+      if (pMode === 'existing' && !partner2) { toast.error('Chọn khách làm người thứ 2 trong nhóm 1:2.'); return }
+      if (pMode === 'new' && !p2.goals.length) { toast.error('Chọn ít nhất một nhóm mục tiêu cho người thứ 2.'); return }
+    }
     start(async () => {
       setStep(isNew ? 'Đang tạo hồ sơ…' : '')
-      const r = await saveClient(f, client?.id)
+      const partner: PartnerInput = pMode === 'existing' ? { mode: 'existing', id: p2Id }
+        : { mode: 'new', input: { ...p2, start_date: f.start_date, status: f.status } }
+      const r = withPartner ? await saveClientPair(f, partner, client?.id) : await saveClient(f, client?.id)
       if (!r.ok) { setStep(''); toast.error(r.error); return }
       const id = r.data!.id
       if (avatar) {
@@ -106,8 +139,15 @@ export function ClientForm({ client, pkg, pts, isFm, meId, tiers = [] }: {
         }
       }
       toast.success(client ? 'Đã lưu hồ sơ.' : 'Đã tạo hồ sơ khách.')
+      const paired = r.data as { id: string; partnerId?: string; groupId?: string }
+      if (paired.groupId) {
+        setStep('Đang lưu chỉ số của hai người…')
+        await saveInitial(id, isNew && pMode === 'new' ? m1 : {})
+        await saveInitial(paired.partnerId!, pMode === 'new' ? m2 : {})
+        toast.success('Đã lập nhóm 1:2.')
+      }
       const tab = isNew ? await createStarters(id) : ''
-      router.push(`/khach-hang/${id}${tab ? `?tab=${tab}` : ''}`)
+      router.push(paired.groupId && !tab ? `/nhom/${paired.groupId}` : `/khach-hang/${id}${tab ? `?tab=${tab}` : ''}`)
       router.refresh()
     })
   }
@@ -212,12 +252,38 @@ export function ClientForm({ client, pkg, pts, isFm, meId, tiers = [] }: {
         </label>
       </Section>
 
+      {isPair && isKid && <p className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">Khách trẻ em tập theo nhóm trẻ em — lập nhóm ở mục Nhóm tập.</p>}
+
+      {isPair && pair && (
+        <Section title="Nhóm 1:2">
+          <p className="text-sm">Đang tập cùng: <b>{pair.partners.map((p) => p.full_name).join(', ') || '—'}</b></p>
+          <Link href={`/nhom/${pair.groupId}`} className="inline-flex min-h-11 items-center text-sm font-medium text-brand hover:underline">Xem bảng theo dõi của cả hai</Link>
+        </Section>
+      )}
+
+      {showPartner && (
+        <Section title="Người thứ 2 trong nhóm 1:2">
+          <PartnerPanel mode={pMode} onMode={setPMode} value={p2} onChange={setP2} candidates={eligible} selected={p2Id} onSelect={setP2Id} tiers={isFm ? tiers : []} />
+        </Section>
+      )}
+
+      {showPartner && isNew && pMode === 'new' && (
+        <Section title="Bảng chỉ số ban đầu của hai người">
+          <PairMetricsFields types={metricTypes} people={[
+            { name: f.full_name || 'Người thứ 1', goals: f.goals, values: m1, onChange: setM1 },
+            { name: p2.full_name || 'Người thứ 2', goals: p2.goals, values: m2, onChange: setM2 },
+          ]} />
+        </Section>
+      )}
+
       {isNew && (
         <Section title="Lịch tập & thực đơn ban đầu">
           <p className="text-sm text-muted-foreground">
             Tạo luôn khi lưu hồ sơ — hiện ngay trong hồ sơ khách (tab Giáo án / Thực đơn). App tự tạo &quot;Giai đoạn 1&quot; bắt đầu hôm nay.
             Mọi thứ tạo ra đều <b className="text-foreground">chưa chia sẻ</b>: PT xem lại rồi mới bấm Chia sẻ.
           </p>
+
+          {withPartner && <p className="rounded-lg bg-secondary p-3 text-sm text-muted-foreground">Phần này tạo cho <b className="text-foreground">người thứ 1</b>. Giáo án dùng chung cho cả hai tạo ở trang nhóm sau khi lưu.</p>}
 
           <div className="space-y-3 rounded-lg border border-border p-3">
             <Field label="Lịch tập">
@@ -273,7 +339,7 @@ export function ClientForm({ client, pkg, pts, isFm, meId, tiers = [] }: {
       <div className="no-print sticky bottom-20 z-10 grid grid-cols-[auto_1fr] gap-2 md:bottom-4">
         <Button type="button" variant="secondary" size="lg" className="shadow-lg" disabled={pending} onClick={() => router.back()}>Huỷ</Button>
         <Button type="submit" size="lg" className="shadow-lg" disabled={pending}>
-          {pending ? (step || 'Đang lưu…') : client ? 'Lưu hồ sơ' : (wMode === 'ai' || mMode === 'ai') ? '✦ Tạo hồ sơ & kế hoạch' : 'Tạo hồ sơ khách'}
+          {pending ? (step || 'Đang lưu…') : client ? 'Lưu hồ sơ' : (wMode === 'ai' || mMode === 'ai') ? '✦ Tạo hồ sơ & kế hoạch' : withPartner ? 'Tạo hồ sơ & nhóm 1:2' : 'Tạo hồ sơ khách'}
         </Button>
       </div>
     </form>

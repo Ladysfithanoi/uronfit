@@ -1,9 +1,10 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { Pencil, TriangleAlert } from 'lucide-react'
+import { ChevronRight, Pencil, TriangleAlert, Users } from 'lucide-react'
 import { requirePageRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import { pairOf } from '@/lib/pairs'
 import { signedUrls } from '@/lib/storage'
 import { CLIENT_COLUMNS, activePackage, ageFrom, type Client, type Package, type Phase } from '@/lib/clients'
 import { CLIENT_STATUS_LABEL, GOAL_LABEL, TRAINING_TYPE_LABEL } from '@/lib/labels'
@@ -46,6 +47,7 @@ export default async function ClientPage({ params, searchParams }: {
   const pkg = activePackage(pkgs as Package[])
   const left = pkg ? pkg.total_sessions - pkg.used_sessions : null
   const avatar = (await signedUrls('client-media', [c.avatar_path])).get(c.avatar_path ?? '')
+  const pair = c.is_kid ? null : await pairOf(id)
   const age = ageFrom(c.birth_date)
 
   return (
@@ -69,6 +71,20 @@ export default async function ClientPage({ params, searchParams }: {
         </div>
         <Link href={`/khach-hang/${id}/sua`} className={buttonVariants({ variant: 'outline', size: 'icon' })} aria-label="Sửa hồ sơ"><Pencil /></Link>
       </div>
+
+      {pair ? (
+        <Link href={`/nhom/${pair.groupId}`} className="no-print mb-4 flex min-h-14 items-center gap-3 rounded-xl border border-border bg-card px-4 py-2 transition-colors hover:bg-secondary">
+          <Users className="size-5 shrink-0 text-brand" />
+          <span className="min-w-0 flex-1"><span className="block truncate font-medium">Tập 1:2 cùng {pair.partners.map((p) => p.full_name).join(', ') || '—'}</span><span className="block text-xs text-muted-foreground">Theo dõi tiến độ & chỉ số của cả hai</span></span>
+          <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
+        </Link>
+      ) : c.training_type === 'one_on_two' && !c.is_kid && (
+        <Link href={`/khach-hang/${id}/sua`} className="no-print mb-4 flex min-h-14 items-center gap-3 rounded-xl border border-dashed border-border px-4 py-2 transition-colors hover:bg-secondary">
+          <Users className="size-5 shrink-0 text-brand" />
+          <span className="flex-1 text-sm">Khách tập 1:2 nhưng chưa có người thứ 2 — bấm để thêm.</span>
+          <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
+        </Link>
+      )}
 
       {left !== null && left <= 3 && (
         <div className="mb-4 rounded-xl border border-warning/40 bg-warning/10 p-3 text-sm">

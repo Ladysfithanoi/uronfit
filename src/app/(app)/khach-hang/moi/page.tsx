@@ -3,6 +3,8 @@ import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { requirePageRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import { pairCandidates } from '@/lib/pairs'
+import type { MetricType } from '@/lib/metrics'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { ClientForm } from '../ClientForm'
 
@@ -16,11 +18,14 @@ export default async function NewClientPage() {
   const supabase = await createClient()
   const { data: tiers } = await supabase.from('service_tiers').select('id, name, is_default').order('sort_order')
   const { data: pts } = await supabase.from('profiles').select('id, full_name').eq('role', 'pt').eq('is_active', true).order('full_name')
+  const [candidates, { data: metricTypes }] = await Promise.all([
+    pairCandidates(), supabase.from('metric_types').select('*').is('client_id', null),
+  ])
   return (
     <div className="max-w-2xl">
       <Link href="/khach-hang" className="mb-3 inline-flex min-h-11 items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ChevronLeft className="size-4" /> Khách hàng</Link>
       <PageHeader eyebrow="Khách hàng" title="Thêm khách mới" />
-      <ClientForm pts={pts ?? []} isFm={me.role === 'fm'} meId={me.id} tiers={tiers ?? []} />
+      <ClientForm pts={pts ?? []} isFm={me.role === 'fm'} meId={me.id} tiers={tiers ?? []} candidates={candidates} metricTypes={(metricTypes ?? []) as MetricType[]} />
     </div>
   )
 }
