@@ -11,7 +11,7 @@ import { suggest } from '@/lib/nutrition'
 import { generateMealDay, mealCountProblem } from '@/lib/ai/meal-engine'
 import { generateGeminiJson, geminiConfigured } from '@/lib/ai/gemini'
 import {
-  buildFallbackPlan, buildPrompt, prepareLibrary, sanitizeAnswers, sanitizePlan, PLAN_SCHEMA,
+  buildFallbackPlan, buildPrompt, prepareLibrary, sanitizeAnswers, sanitizePlan, supersetMode, PLAN_SCHEMA,
   type ClientContext, type LibraryExercise, type PlanDay, type WorkoutAnswers,
 } from '@/lib/ai/workout'
 import type { GoalGroup } from '@/lib/types'
@@ -93,7 +93,7 @@ export async function aiCreateWorkoutPlan(clientId: string, rawAnswers: Partial<
       try {
         const { system, prompt, refToEx } = buildPrompt(answers, ctx, library)
         const raw = await generateGeminiJson({ system, prompt, schema: PLAN_SCHEMA, temperature: 0.6, maxOutputTokens: 6000, budgetMs: 45_000 })
-        const plan = sanitizePlan(raw, refToEx, answers.sessionsPerWeek)
+        const plan = sanitizePlan(raw, refToEx, answers.sessionsPerWeek, supersetMode(answers, ctx) !== 'none')
         if (plan.days.length) { days = plan.days; name = answers.name || plan.name; usedAi = true }
       } catch (e) { console.error('[ai/workout] dựng theo quy tắc:', e instanceof Error ? e.message : e) }
     }
@@ -111,7 +111,7 @@ export async function aiCreateWorkoutPlan(clientId: string, rawAnswers: Partial<
         const s = must(await supabase.from('workout_sessions').insert({ plan_id: plan.id, week: w, day_order: i + 1, title: d.label }).select('id').single())
         must(await supabase.from('session_exercises').insert(d.exercises.map((e, k) => ({
           session_id: s.id, exercise_id: e.exercise_id, sort_order: k + 1, sets: e.sets, reps: e.reps,
-          duration_sec: e.duration_sec, rest_sec: e.rest_sec, notes: e.note,
+          duration_sec: e.duration_sec, rest_sec: e.rest_sec, notes: e.note, superset_group: e.superset,
         }))))
       }
     }

@@ -16,6 +16,7 @@ Quyết định đã đổi so với brief (người dùng duyệt 20/11/2026):
 - Tạo lịch tập & thực đơn bằng AI (Gemini, env GEMINI_API_KEYS) — `src/lib/ai/`: workout.ts (theo training-plan; loại bài chống chỉ định TRƯỚC khi gửi AI; dự phòng theo quy tắc), meal-engine.ts + foods-data.ts (chép nguyên bộ giải diet-plan; khoá trẻ em & phục hồi). Nút ở cuối form Thêm khách và tab Giáo án/Thực đơn; kết quả không tự chia sẻ.
 - Gói dịch vụ (migration 011, `src/lib/features.ts`): FM bật/tắt tính năng phía khách theo gói; chặn ở RLS qua `portal_allows(cid, feat)` / `client_has_feature`; trang `/fm/goi-dich-vu`; chỉ FM đổi tier_id (trigger). Tính năng mới phía khách phải có mã trong FEATURES + kiểm tra ở cả RLS lẫn trang `/me`.
 - Tập 1:2: form khách có bảng phụ người thứ 2 (PartnerPanel, saveClientPair — lỗi thì hoàn tác); bảng theo dõi song song ở nhom/[id] (PairBoard) CHỈ dành cho HLV, hai khách không được thấy dữ liệu của nhau.
+- Superset (migration 012, `src/lib/superset.ts`): bài liền nhau cùng `superset_group` (A–Z) tập luân phiên, tối đa 4 bài; nhãn A, B1, B2 tính khi hiển thị; PT ghép/tách trong giáo án; AI có lựa chọn superset (khoá với phục hồi & trẻ em).
 - Thư viện bài tập nhập thêm từ app training-plan bằng `npm run import:exercises` (chỉ đọc nguồn, idempotent).
 
 Quy ước:

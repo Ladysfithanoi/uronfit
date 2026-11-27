@@ -1,10 +1,10 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { Fragment, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
-  ArrowDown, ArrowUp, CalendarDays, Check, Copy, MoreHorizontal, Pencil, Plus, Printer, Search, Share2, Trash2, TriangleAlert, UserRound,
+  ArrowDown, ArrowUp, CalendarDays, Check, Copy, Link2, MoreHorizontal, Unlink, Pencil, Plus, Printer, Search, Share2, Trash2, TriangleAlert, UserRound,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,6 +19,8 @@ import { Pager, usePaged } from '@/components/ui/pagination'
 import { confirmDialog, promptDialog } from '@/components/ui/app-dialog'
 import { ProgressBar } from './ProgressBar'
 import { exerciseLine } from './format'
+import { OrderBadge, SupersetFrame } from './SupersetFrame'
+import { MAX_SUPERSET, supersetBlocks } from '@/lib/superset'
 import { HEALTH_FLAG_LABEL } from '@/lib/labels'
 import { formatDate, formatDateTime } from '@/lib/date'
 import { cleanDecimalInput, fmtNum } from '@/lib/num'
@@ -137,6 +139,7 @@ function SessionCard({ s, isTemplate, isGroup, members, memberName, pending, onA
 }) {
   const base = s.exercises.filter((e) => !e.client_id)
   const personal = s.exercises.filter((e) => e.client_id)
+  const blocks = supersetBlocks(base)
   const att = new Map(s.attendance.map((a) => [a.client_id, a.present]))
 
   return (
@@ -168,24 +171,36 @@ function SessionCard({ s, isTemplate, isGroup, members, memberName, pending, onA
         </DropdownMenu>
       </div>
 
-      <ol className="space-y-2">
-        {base.map((e, i) => (
-          <li key={e.id}>
-            <ExerciseRow e={e} index={i + 1} onClick={() => onEdit(e)} />
+      <div className="space-y-2">
+        {blocks.map((b, bi) => {
+          const rows = b.items.map(({ e, label, last }) => {
+            const i = base.indexOf(e)
+            const nextBlock = last ? blocks[bi + 1] : undefined
+            const canLink = !!nextBlock && b.items.length + nextBlock.items.length <= MAX_SUPERSET
+            return (
+          <div key={e.id}>
+            <ExerciseRow e={e} label={label} superset={b.superset} chained={b.superset && !last} onClick={() => onEdit(e)} />
             {personal.filter((p) => p.replaces_id === e.id).map((p) => (
               <button key={p.id} type="button" onClick={() => onEdit(p)} className="ml-6 mt-1 flex w-[calc(100%-1.5rem)] items-start gap-2 rounded-lg border border-dashed border-border p-2 text-left text-sm">
                 <UserRound className="mt-0.5 size-4 shrink-0 text-brand" />
                 <span><b>Riêng {memberName.get(p.client_id!)}:</b> {p.exercise.name} — <span className="text-muted-foreground">{exerciseLine(p)}</span></span>
               </button>
             ))}
-            <div className="no-print ml-6 flex gap-1">
+            <div className="no-print ml-8 flex flex-wrap items-center gap-1">
               <Button size="icon-sm" variant="ghost" aria-label="Lên" disabled={i === 0 || pending} onClick={() => act(A.moveSessionExercise(s.id, e.id, -1))}><ArrowUp /></Button>
               <Button size="icon-sm" variant="ghost" aria-label="Xuống" disabled={i === base.length - 1 || pending} onClick={() => act(A.moveSessionExercise(s.id, e.id, 1))}><ArrowDown /></Button>
+              {canLink && <Button size="sm" variant="ghost" disabled={pending} onClick={() => act(A.linkSuperset(s.id, e.id), 'Đã ghép superset.')}><Link2 /> Ghép superset với bài dưới</Button>}
+              {b.superset && <Button size="sm" variant="ghost" disabled={pending} onClick={() => act(A.unlinkSuperset(s.id, e.id))}><Unlink /> Tách khỏi nhóm</Button>}
             </div>
-          </li>
-        ))}
+          </div>
+            )
+          })
+          return b.superset
+            ? <SupersetFrame key={b.items[0].e.id} size={b.items.length} rounds={b.items[0].e.sets}>{rows}</SupersetFrame>
+            : <Fragment key={b.items[0].e.id}>{rows}</Fragment>
+        })}
         {base.length === 0 && <p className="text-sm text-muted-foreground">Chưa có bài tập.</p>}
-      </ol>
+      </div>
 
       {s.comment && <p className="mt-3 rounded-lg bg-secondary p-2 text-sm"><b>Nhận xét:</b> {s.comment}</p>}
 
@@ -217,13 +232,13 @@ function SessionCard({ s, isTemplate, isGroup, members, memberName, pending, onA
   )
 }
 
-function ExerciseRow({ e, index, onClick }: { e: PlanExercise; index: number; onClick: () => void }) {
+function ExerciseRow({ e, label, superset, chained, onClick }: { e: PlanExercise; label: string; superset: boolean; chained: boolean; onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} className="flex min-h-12 w-full items-start gap-3 rounded-lg p-2 text-left hover:bg-secondary">
-      <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-bold">{index}</span>
+      <OrderBadge label={label} superset={superset} />
       <span className="min-w-0 flex-1">
         <span className="block font-medium">{e.exercise.name}</span>
-        <span className="block text-sm text-muted-foreground">{exerciseLine(e)}</span>
+        <span className="block text-sm text-muted-foreground">{exerciseLine(e, chained)}</span>
         {e.notes && <span className="block text-xs text-muted-foreground">↳ {e.notes}</span>}
         {e.actual_weight_kg !== null && <span className="block text-xs text-success">Tạ thực tế: {fmtNum(Number(e.actual_weight_kg))} kg</span>}
       </span>
@@ -313,7 +328,7 @@ function ExerciseEditor({ ex, isGroup, members, pending, act, onClose, onPersona
             <Field label="Lần lặp" htmlFor="e-reps"><Input id="e-reps" placeholder="10 / 8-12" value={f.reps} onChange={(e) => setF({ ...f, reps: e.target.value })} /></Field>
             <Field label="Thời gian (giây)" htmlFor="e-dur"><Input id="e-dur" inputMode="numeric" value={f.duration_sec} onChange={(e) => setF({ ...f, duration_sec: e.target.value.replace(/\D/g, '') })} /></Field>
             <Field label="Mức tạ (kg)" htmlFor="e-kg"><Input id="e-kg" inputMode="decimal" value={f.weight_kg} onChange={(e) => setF({ ...f, weight_kg: cleanDecimalInput(e.target.value) })} /></Field>
-            <Field label="Nghỉ (giây)" htmlFor="e-rest"><Input id="e-rest" inputMode="numeric" value={f.rest_sec} onChange={(e) => setF({ ...f, rest_sec: e.target.value.replace(/\D/g, '') })} /></Field>
+            <Field label={ex.superset_group ? "Nghỉ sau cả nhóm (giây)" : "Nghỉ (giây)"} htmlFor="e-rest"><Input id="e-rest" inputMode="numeric" value={f.rest_sec} onChange={(e) => setF({ ...f, rest_sec: e.target.value.replace(/\D/g, '') })} /></Field>
           </div>
           <Field label="Ghi chú kỹ thuật" htmlFor="e-notes"><Textarea id="e-notes" value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></Field>
           {isGroup && !ex.client_id && members.length > 0 && (

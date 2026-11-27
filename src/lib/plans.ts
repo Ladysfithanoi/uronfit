@@ -5,7 +5,7 @@ import { signedUrls } from '@/lib/storage'
 export type PlanExercise = {
   id: string; session_id: string; exercise_id: string; client_id: string | null; replaces_id: string | null; sort_order: number
   sets: number | null; reps: string | null; duration_sec: number | null; weight_kg: number | null; rest_sec: number | null
-  notes: string | null; actual_weight_kg: number | null
+  notes: string | null; actual_weight_kg: number | null; superset_group: string | null
   exercise: { name: string; muscle_group: string | null; equipment: string | null; description: string | null
     video_url: string | null; image_url: string | null; tags: string[]; contraindications: string[] }
 }
@@ -39,7 +39,7 @@ export async function loadSessions(planIds: string[]): Promise<Map<string, PlanS
   const [{ data: exs }, { data: att }] = ids.length
     ? await Promise.all([
         supabase.from('session_exercises')
-          .select('id, session_id, exercise_id, client_id, replaces_id, sort_order, sets, reps, duration_sec, weight_kg, rest_sec, notes, actual_weight_kg, exercises(name, muscle_group, equipment, description, video_url, image_path, tags, contraindications)')
+          .select('id, session_id, exercise_id, client_id, replaces_id, sort_order, sets, reps, duration_sec, weight_kg, rest_sec, notes, actual_weight_kg, superset_group, exercises(name, muscle_group, equipment, description, video_url, image_path, tags, contraindications)')
           .in('session_id', ids).order('sort_order'),
         supabase.from('attendance').select('session_id, client_id, present').in('session_id', ids),
       ])

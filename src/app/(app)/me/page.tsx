@@ -11,6 +11,7 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { KidSwitcher } from '@/components/portal/KidSwitcher'
 import { ProgressBar } from '@/components/plans/ProgressBar'
 import { exerciseLine } from '@/components/plans/format'
+import { clientExercises, supersetBlocks } from '@/lib/superset'
 
 export const metadata: Metadata = { title: 'Trang chủ' }
 
@@ -28,7 +29,7 @@ export default async function ClientHome() {
   const allSessions = curPlans.flatMap((p) => sessionsByPlan.get(p.id) ?? [])
   const next = allSessions.find((s) => !s.completed_at && !s.attendance.some((a) => a.client_id === client.id && a.present))
   const nextPlan = next ? curPlans.find((p) => (sessionsByPlan.get(p.id) ?? []).some((s) => s.id === next.id)) : null
-  const nextExercises = next ? next.exercises.filter((e) => !e.client_id || e.client_id === client.id).filter((e, _, arr) => e.client_id || !arr.some((x) => x.replaces_id === e.id)) : []
+  const nextExercises = next ? supersetBlocks(clientExercises(next.exercises, client.id)).flatMap((b) => b.items.map((x) => ({ ...x.e, label: x.label, chained: b.superset && !x.last }))) : []
 
   const [{ data: mealPlan }, { data: pkgs }, { data: notes }] = await Promise.all([
     phase ? supabase.from('meal_plans').select('id, name, kcal, shared_at').eq('phase_id', phase.id).not('shared_at', 'is', null).order('created_at', { ascending: false }).limit(1).maybeSingle()
@@ -74,7 +75,7 @@ export default async function ClientHome() {
               <p className="mt-1 font-semibold">{next.title || `Buổi ${next.day_order}`} <span className="text-sm font-normal text-muted-foreground">· Tuần {next.week}{next.scheduled_date && ` · ${formatDate(next.scheduled_date)}`}</span></p>
               {nextPlan && <p className="text-xs text-muted-foreground">{nextPlan.name}</p>}
               <ul className="mt-2 space-y-1 text-sm">
-                {nextExercises.slice(0, 5).map((e) => <li key={e.id}>• {e.exercise.name} <span className="text-muted-foreground">— {exerciseLine(e)}</span></li>)}
+                {nextExercises.slice(0, 5).map((e) => <li key={e.id}><b className="text-brand">{e.label}</b> {e.exercise.name} <span className="text-muted-foreground">— {exerciseLine(e, e.chained)}</span></li>)}
                 {nextExercises.length > 5 && <li className="text-muted-foreground">+ {nextExercises.length - 5} bài nữa</li>}
               </ul>
               <Link href="/me/giao-an" className="mt-3 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-brand">Xem giáo án <ChevronRight className="size-4" /></Link>

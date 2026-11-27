@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { Fragment, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Check, ChevronDown, Printer, Video } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -10,18 +10,15 @@ import { ExerciseDetail } from '@/components/exercises/ExerciseDetail'
 import { ProgressBar } from './ProgressBar'
 import { Pager, usePaged, useScrollTop } from '@/components/ui/pagination'
 import { exerciseLine } from './format'
+import { OrderBadge, SupersetFrame } from './SupersetFrame'
+import { clientExercises, supersetBlocks } from '@/lib/superset'
 import { formatDate } from '@/lib/date'
 import type { PlanExercise, PlanSession } from '@/lib/plans'
 import { completeSelfSession } from '@/app/(app)/giao-an/actions'
 import { cn } from '@/lib/utils'
 
 /** Bài khách thực sự tập: dòng chỉnh riêng cho mình thay cho dòng chung */
-function myExercises(s: PlanSession, clientId: string) {
-  const mine = s.exercises.filter((e) => e.client_id === clientId)
-  return s.exercises
-    .filter((e) => !e.client_id)
-    .flatMap((e) => { const o = mine.find((m) => m.replaces_id === e.id); return [o ?? e] })
-}
+const myExercises = (s: PlanSession, clientId: string) => clientExercises(s.exercises, clientId)
 
 export function PlanViewer({ clientId, name, subtitle, sessions, isGroup, canSelfTrack = true, canPrint = true }: {
   clientId: string; name: string; subtitle: string; sessions: PlanSession[]; isGroup: boolean
@@ -68,21 +65,24 @@ export function PlanViewer({ clientId, name, subtitle, sessions, isGroup, canSel
                     <ChevronDown className={cn('size-5 text-muted-foreground transition-transform', expanded && 'rotate-180')} />
                   </button>
                   <div className={cn('border-t border-border px-4 pb-4', !expanded && 'hidden print:block')}>
-                    <ol className="mt-2 space-y-1">
-                      {exs.map((e, i) => (
-                        <li key={e.id}>
-                          <button type="button" onClick={() => setView(e)} className="flex min-h-12 w-full items-start gap-3 rounded-lg p-2 text-left hover:bg-secondary">
-                            <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-bold">{i + 1}</span>
+                    <div className="mt-2 space-y-1">
+                      {supersetBlocks(exs).map((b) => {
+                        const rows = b.items.map(({ e, label, last }) => (
+                          <button key={e.id} type="button" onClick={() => setView(e)} className="flex min-h-12 w-full items-start gap-3 rounded-lg p-2 text-left hover:bg-secondary">
+                            <OrderBadge label={label} superset={b.superset} />
                             <span className="flex-1">
                               <span className="block font-medium">{e.exercise.name} {e.client_id && <Badge variant="outline" className="ml-1">Riêng bạn</Badge>}</span>
-                              <span className="block text-sm text-muted-foreground">{exerciseLine(e)}</span>
+                              <span className="block text-sm text-muted-foreground">{exerciseLine(e, b.superset && !last)}</span>
                               {e.notes && <span className="block text-xs text-muted-foreground">↳ {e.notes}</span>}
                             </span>
                             {(e.exercise.video_url || e.exercise.image_url) && <Video className="mt-1 size-4 shrink-0 text-brand" aria-label="Có hướng dẫn" />}
                           </button>
-                        </li>
-                      ))}
-                    </ol>
+                        ))
+                        return b.superset
+                          ? <SupersetFrame key={b.items[0].e.id} size={b.items.length} rounds={b.items[0].e.sets}>{rows}</SupersetFrame>
+                          : <Fragment key={b.items[0].e.id}>{rows}</Fragment>
+                      })}
+                    </div>
                     {s.comment && <p className="mt-2 rounded-lg bg-secondary p-2 text-sm"><b>HLV nhận xét:</b> {s.comment}</p>}
                     {s.is_self_training && !isGroup && canSelfTrack && (
                       <Button className="no-print mt-3 w-full" variant={s.completed_at ? 'secondary' : 'default'} disabled={pending}

@@ -1,5 +1,6 @@
 import 'server-only'
 import type { GoalGroup } from '@/lib/types'
+import { MAX_SUPERSET, normalizeGroups, supersetBlocks } from '@/lib/superset'
 
 /**
  * Lịch tập bằng AI — theo cách của app training-plan: PT khai báo → dựng prompt kèm
@@ -21,7 +22,10 @@ export type WorkoutAnswers = {
   equipment: AiEquipment
   focusMuscles: string[]
   notes: string
+  /** Ghép superset: AI tự quyết / không dùng / ưu tiên dùng */
+  supersets: SupersetPref
 }
+export type SupersetPref = 'auto' | 'none' | 'prefer'
 
 export type ClientContext = {
   gender: 'female' | 'male'
@@ -36,7 +40,7 @@ export type LibraryExercise = {
   id: string; name: string; muscle_group: string | null; equipment: string | null; tags: string[]; contraindications: string[]
 }
 
-export type PlanExercise = { exercise_id: string; name: string; sets: number; reps: string | null; duration_sec: number | null; rest_sec: number; note: string | null }
+export type PlanExercise = { exercise_id: string; name: string; sets: number; reps: string | null; duration_sec: number | null; rest_sec: number; note: string | null; superset: string | null }
 export type PlanDay = { label: string; exercises: PlanExercise[] }
 export type WorkoutDraft = { name: string; days: PlanDay[]; usedAi: boolean; dropped: number; excludedForSafety: number }
 
@@ -68,6 +72,7 @@ export function sanitizeAnswers(raw: Partial<WorkoutAnswers>): WorkoutAnswers {
     equipment: (['full_gym', 'machines_dumbbells', 'home_minimal'] as const).includes(raw.equipment as AiEquipment) ? raw.equipment as AiEquipment : 'full_gym',
     focusMuscles: Array.isArray(raw.focusMuscles) ? raw.focusMuscles.filter((m) => (FOCUS_OPTIONS as readonly string[]).includes(m)) : [],
     notes: txt(raw.notes, 500),
+    supersets: (['auto', 'none', 'prefer'] as const).includes(raw.supersets as SupersetPref) ? raw.supersets as SupersetPref : 'auto',
   }
 }
 
@@ -101,10 +106,11 @@ LUẬT BẮT BUỘC:
 - Thứ tự: khởi động / kích hoạt (nếu có) → bài đa khớp nặng → bài cô lập → core.
 - Mỗi bài: sets 1–5; "reps" là chuỗi như "10" hoặc "8-12"; bài giữ tư thế / cardio dùng "duration_sec" (giây) và để reps = ""; "rest_sec" 30–180.
 - "note": một lưu ý kỹ thuật ngắn (≤ 100 ký tự) hoặc "".
+- SUPERSET (tập luân phiên, kiểu A1/A2): các bài cùng nhóm có cùng chữ cái in hoa ở trường "superset" ("A", "B"…) và PHẢI đứng liền nhau; bài tập đơn để "superset" = "". Mỗi nhóm 2–3 bài, cùng số hiệp. Ghép cặp hợp lý: cơ đối kháng (đẩy – kéo), thân trên – thân dưới, hoặc bài chính + bài core / bổ trợ — không ghép hai bài đa khớp nặng cùng vùng. Trong nhóm, "rest_sec" của các bài trước đặt 0–15; bài CUỐI nhóm mang thời gian nghỉ sau cả nhóm. Không dùng superset cho bài nặng nhất đầu buổi khi mục tiêu là sức mạnh.
 - TÔN TRỌNG TIỀN SỬ SỨC KHOẺ: tránh mọi động tác làm nặng vùng bị ảnh hưởng, ưu tiên phương án an toàn hơn.
 
 THEO MỤC TIÊU:
-- Giảm mỡ: 8–15 lần, nghỉ 45–75 giây, ưu tiên bài đa khớp, có thể ghép cặp (superset) để tăng mật độ.
+- Giảm mỡ: 8–15 lần, nghỉ 45–75 giây, ưu tiên bài đa khớp, nên ghép superset để tăng mật độ.
 - Tăng cân / tăng cơ: 6–12 lần với bài đa khớp, 10–20 lần với máy/cáp/cô lập, nghỉ 60–120 giây.
 - Chỉnh dáng: kích hoạt và tăng sức mạnh chuỗi cơ yếu (mông nhỡ, lưng trên, core sâu), kết hợp bài di động; ưu tiên bài có nhãn "chỉnh dáng"; nhịp chậm, kiểm soát.
 - Phục hồi chức năng: RẤT THẬN TRỌNG — tải nhẹ, biên độ không đau, nhiều bài giữ tĩnh và kiểm soát vận động, ưu tiên bài có nhãn "phục hồi", không gắng sức tối đa, 1–3 hiệp.
@@ -127,9 +133,9 @@ export const PLAN_SCHEMA: Record<string, unknown> = {
               type: 'object',
               properties: {
                 ref: { type: 'string' }, sets: { type: 'integer' }, reps: { type: 'string' },
-                duration_sec: { type: 'integer' }, rest_sec: { type: 'integer' }, note: { type: 'string' },
+                duration_sec: { type: 'integer' }, rest_sec: { type: 'integer' }, note: { type: 'string' }, superset: { type: 'string' },
               },
-              required: ['ref', 'sets', 'reps', 'duration_sec', 'rest_sec', 'note'],
+              required: ['ref', 'sets', 'reps', 'duration_sec', 'rest_sec', 'note', 'superset'],
             },
           },
         },
@@ -138,6 +144,17 @@ export const PLAN_SCHEMA: Record<string, unknown> = {
     },
   },
   required: ['name', 'days'],
+}
+
+const SUPERSET_BRIEF: Record<SupersetPref, string> = {
+  none: 'KHÔNG dùng — mọi bài để "superset" = ""',
+  auto: 'tự quyết theo mục tiêu và thời lượng buổi',
+  prefer: 'ưu tiên dùng — ghép phần lớn bài phụ / cô lập thành nhóm 2–3 bài',
+}
+
+/** Phục hồi chức năng & trẻ em: không ghép superset (an toàn, dễ theo dõi) */
+export function supersetMode(answers: WorkoutAnswers, ctx: ClientContext): SupersetPref {
+  return ctx.isKid || ctx.goals.includes('kids') || ctx.goals.includes('rehab') ? 'none' : answers.supersets
 }
 
 const GOAL_VI: Record<GoalGroup, string> = { fat_loss: 'Giảm cân / giảm mỡ', weight_gain: 'Tăng cân / tăng cơ', posture: 'Chỉnh dáng', rehab: 'Phục hồi chức năng', kids: 'Trẻ em' }
@@ -158,6 +175,7 @@ export function buildPrompt(answers: WorkoutAnswers, ctx: ClientContext, library
     `- Dụng cụ: ${EQUIP_BRIEF[answers.equipment]}`,
     `- Nhóm cơ ưu tiên: ${answers.focusMuscles.join(', ') || 'cân đối'}`,
     `- Tiền sử sức khoẻ / hạn chế: ${ctx.healthText || 'không ghi nhận'}`,
+    `- Superset: ${SUPERSET_BRIEF[supersetMode(answers, ctx)]}`,
     answers.notes ? `- Ghi chú của PT: ${answers.notes}` : null,
     answers.name ? `- Tên giáo án (dùng đúng): ${answers.name}` : '- Tên giáo án: đặt tên ngắn bằng tiếng Việt theo mục tiêu',
   ].filter(Boolean).join('\n')
@@ -173,7 +191,7 @@ function shortLabel(s: string, max: number) {
 }
 
 /** Biến câu trả lời (không tin cậy) của AI thành danh sách buổi hợp lệ. */
-export function sanitizePlan(raw: unknown, refToEx: Map<string, LibraryExercise>, sessions: number) {
+export function sanitizePlan(raw: unknown, refToEx: Map<string, LibraryExercise>, sessions: number, allowSupersets = true) {
   const root = (raw && typeof raw === 'object' ? raw : {}) as { name?: unknown; days?: unknown }
   let dropped = 0
   const days: PlanDay[] = []
@@ -192,12 +210,36 @@ export function sanitizePlan(raw: unknown, refToEx: Map<string, LibraryExercise>
       exercises.push({
         exercise_id: ex.id, name: ex.name, sets: clampInt(e.sets, 1, 6, 3),
         reps: reps || (dur ? null : '10'), duration_sec: dur || null,
-        rest_sec: clampInt(e.rest_sec, 15, 300, 60), note: txt(e.note, 150) || null,
+        rest_sec: clampInt(e.rest_sec, 0, 300, 60), note: txt(e.note, 150) || null,
+        superset: allowSupersets && /^[A-Za-z]$/.test(txt(e.superset, 2)) ? txt(e.superset, 2).toUpperCase() : null,
       })
     }
+    fixSupersets(exercises)
     if (exercises.length) days.push({ label: shortLabel(txt(day.label, 200), 40) || `Buổi ${days.length + 1}`, exercises })
   }
   return { name: shortLabel(txt(root.name, 200), 80), days, dropped }
+}
+
+/**
+ * Chuẩn hoá superset AI trả về: chỉ giữ nhóm 2–4 bài liền nhau, đặt lại chữ A, B…;
+ * bài chưa phải cuối nhóm không nghỉ quá 15 giây; bài đơn nghỉ tối thiểu 15 giây.
+ */
+export function fixSupersets(list: PlanExercise[]) {
+  const rows = list.map((e, i) => ({ id: String(i), superset_group: e.superset }))
+  for (const b of supersetBlocks(rows)) {
+    if (b.items.length > MAX_SUPERSET) for (const x of b.items) x.e.superset_group = null
+  }
+  const fixed = new Map(normalizeGroups(rows).map((r) => [r.id, r.superset_group]))
+  rows.forEach((r, i) => { list[i].superset = fixed.has(r.id) ? fixed.get(r.id)! : r.superset_group })
+  for (const b of supersetBlocks(rows.map((r, i) => ({ ...r, superset_group: list[i].superset })))) {
+    for (const x of b.items) {
+      const e = list[Number(x.e.id)]
+      if (b.superset && !x.last) e.rest_sec = Math.min(e.rest_sec, 15)
+      else e.rest_sec = Math.max(e.rest_sec, 15)
+    }
+    // cùng số hiệp trong một nhóm
+    if (b.superset) { const sets = list[Number(b.items[0].e.id)].sets; for (const x of b.items) list[Number(x.e.id)].sets = sets }
+  }
 }
 
 // ─── Dự phòng: dựng lịch theo quy tắc khi không có AI ────────────────────────
@@ -238,10 +280,16 @@ export function buildFallbackPlan(answers: WorkoutAnswers, ctx: ClientContext, l
           exercise_id: e.id, name: e.name, sets: rehab ? 2 : 3,
           reps: hold ? null : rehab ? '10' : kids ? '10' : ctx.goals.includes('weight_gain') ? '8-12' : '12',
           duration_sec: hold ? (kids ? 30 : 40) : null, rest_sec: rehab ? 60 : ctx.goals.includes('weight_gain') ? 90 : 60,
-          note: rehab ? 'Biên độ không đau, kiểm soát chậm' : null,
+          note: rehab ? 'Biên độ không đau, kiểm soát chậm' : null, superset: null,
         })
         break
       }
+    }
+    // Ghép superset từng cặp bài phụ (giữ 2 bài chính đầu buổi là bài đơn)
+    const mode = supersetMode(answers, ctx)
+    if (mode === 'prefer' || (mode === 'auto' && ctx.goals.includes('fat_loss'))) {
+      for (let k = 2; k + 1 < exercises.length; k += 2) exercises[k + 1].superset = exercises[k].superset = String.fromCharCode(65 + k)
+      fixSupersets(exercises)
     }
     return { label: tpl.label, exercises }
   }).filter((d) => d.exercises.length)

@@ -13,9 +13,10 @@ export const FOCUS = ['Mông', 'Đùi', 'Lưng', 'Ngực', 'Vai', 'Tay', 'Bụng
 export type WorkoutForm = {
   name: string; level: 'beginner' | 'intermediate' | 'advanced'; sessionsPerWeek: number; sessionMinutes: number
   weeks: number; equipment: 'full_gym' | 'machines_dumbbells' | 'home_minimal'; focusMuscles: string[]; notes: string
+  supersets: 'auto' | 'none' | 'prefer'
 }
 export const defaultWorkout = (): WorkoutForm => ({
-  name: '', level: 'beginner', sessionsPerWeek: 3, sessionMinutes: 60, weeks: 4, equipment: 'full_gym', focusMuscles: [], notes: '',
+  name: '', level: 'beginner', sessionsPerWeek: 3, sessionMinutes: 60, weeks: 4, equipment: 'full_gym', focusMuscles: [], notes: '', supersets: 'auto',
 })
 
 export type MealForm = { name: string; mealCount: number; days: number; kcal: string; protein: string; carb: string; fat: string; likes: string; dislikes: string; weightKg: string }
@@ -55,6 +56,10 @@ export function AiWorkoutFields({ value: f, onChange }: { value: WorkoutForm; on
       </Field>
       <Field label="Nhóm cơ ưu tiên (tuỳ chọn)">
         <ChipGroup multiple options={FOCUS.map((m) => ({ value: m, label: m }))} value={f.focusMuscles} onChange={(v) => set('focusMuscles', v)} />
+      </Field>
+      <Field label="Ghép superset (tập luân phiên A1/A2)" hint="Khách phục hồi chức năng và trẻ em luôn tập bài đơn.">
+        <ChipGroup options={[{ value: 'auto', label: 'AI tự quyết' }, { value: 'prefer', label: 'Ưu tiên ghép' }, { value: 'none', label: 'Không ghép' }]}
+          value={[f.supersets]} onChange={(v) => set('supersets', v[0] as WorkoutForm['supersets'])} />
       </Field>
       <Field label="Ghi chú cho AI (tuỳ chọn)" htmlFor="aw-notes" hint="Vd: ưu tiên mông, tránh bật nhảy, khách hay đau gối khi squat sâu…">
         <Textarea id="aw-notes" rows={2} value={f.notes} onChange={(e) => set('notes', e.target.value)} />

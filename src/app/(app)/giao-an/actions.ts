@@ -5,6 +5,7 @@ import { requireApiRole, HttpError } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { run, must } from '@/lib/action'
 import { parseDecimal, parseIntOrNull } from '@/lib/num'
+import { MAX_SUPERSET, normalizeGroups, supersetBlocks } from '@/lib/superset'
 
 const staff = () => requireApiRole('fm', 'pt')
 const refresh = () => revalidatePath('/', 'layout')
@@ -91,7 +92,7 @@ export async function duplicateWeek(planId: string, week: number) {
     const next = Math.max(...all.map((s) => s.week)) + 1
     for (const s of all.filter((x) => x.week === week)) {
       const ns = must(await supabase.from('workout_sessions').insert({ plan_id: planId, week: next, day_order: s.day_order, title: s.title, is_self_training: s.is_self_training }).select('id').single())
-      const exs = must(await supabase.from('session_exercises').select('exercise_id, sort_order, sets, reps, duration_sec, weight_kg, rest_sec, notes').eq('session_id', s.id).is('client_id', null))
+      const exs = must(await supabase.from('session_exercises').select('exercise_id, sort_order, sets, reps, duration_sec, weight_kg, rest_sec, notes, superset_group').eq('session_id', s.id).is('client_id', null))
       if (exs.length) must(await supabase.from('session_exercises').insert(exs.map((e) => ({ ...e, session_id: ns.id }))))
     }
     refresh(); return { week: next }
@@ -200,7 +201,10 @@ export async function updateSessionExercise(id: string, params: Partial<Exercise
 export async function deleteSessionExercise(id: string) {
   return run(async () => {
     await staff()
-    must(await (await createClient()).from('session_exercises').delete().eq('id', id))
+    const supabase = await createClient()
+    const { data: row } = await supabase.from('session_exercises').select('session_id').eq('id', id).maybeSingle()
+    must(await supabase.from('session_exercises').delete().eq('id', id))
+    if (row) await saveGroups(supabase, row.session_id)
     refresh()
   })
 }
@@ -214,6 +218,55 @@ export async function moveSessionExercise(sessionId: string, id: string, dir: -1
     if (i < 0 || j < 0 || j >= list.length) return
     ;[list[i], list[j]] = [list[j], list[i]]
     for (const [k, x] of list.entries()) must(await supabase.from('session_exercises').update({ sort_order: k + 1 }).eq('id', x.id))
+    await saveGroups(supabase, sessionId)
+    refresh()
+  })
+}
+
+// ─── Superset ───────────────────────────────────────────────────────────────
+type Db = Awaited<ReturnType<typeof createClient>>
+type GroupRow = { id: string; superset_group: string | null }
+
+/** Đọc nhóm của các bài chung trong buổi → áp thay đổi → chuẩn hoá chữ cái → ghi phần khác đi */
+async function saveGroups(supabase: Db, sessionId: string, change?: (list: GroupRow[]) => void) {
+  const list: GroupRow[] = must(await supabase.from('session_exercises').select('id, superset_group').eq('session_id', sessionId).is('client_id', null).order('sort_order'))
+  const before = new Map(list.map((r) => [r.id, r.superset_group]))
+  const work = list.map((r) => ({ ...r }))
+  change?.(work)
+  const fixed = new Map(normalizeGroups(work).map((r) => [r.id, r.superset_group]))
+  for (const r of work) {
+    const g = fixed.has(r.id) ? fixed.get(r.id)! : r.superset_group
+    if (g !== before.get(r.id)) must(await supabase.from('session_exercises').update({ superset_group: g }).eq('id', r.id))
+  }
+}
+
+/** Ghép bài với bài ngay dưới thành superset (gộp luôn nếu một trong hai đã thuộc nhóm) */
+export async function linkSuperset(sessionId: string, id: string) {
+  return run(async () => {
+    await staff()
+    const supabase = await createClient()
+    await saveGroups(supabase, sessionId, (list) => {
+      const i = list.findIndex((x) => x.id === id)
+      if (i < 0 || i >= list.length - 1) throw new HttpError(400, 'Không có bài bên dưới để ghép.')
+      const blocks = supersetBlocks(list)
+      const a = blocks.find((b) => b.items.some((x) => x.e.id === id))!
+      const b = blocks.find((bl) => bl.items.some((x) => x.e.id === list[i + 1].id))!
+      if (a.items.length + b.items.length > MAX_SUPERSET) throw new HttpError(400, `Một nhóm superset tối đa ${MAX_SUPERSET} bài.`)
+      for (const x of [...a.items, ...b.items]) x.e.superset_group = '*' // chữ tạm, chuẩn hoá ngay sau
+    })
+    refresh()
+  })
+}
+
+/** Tách bài khỏi nhóm superset (nhóm còn 1 bài thì tự bỏ nhóm) */
+export async function unlinkSuperset(sessionId: string, id: string) {
+  return run(async () => {
+    await staff()
+    const supabase = await createClient()
+    await saveGroups(supabase, sessionId, (list) => {
+      const r = list.find((x) => x.id === id)
+      if (r) r.superset_group = null
+    })
     refresh()
   })
 }
